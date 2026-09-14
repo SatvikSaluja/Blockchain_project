@@ -30,12 +30,12 @@ Full task detail (acceptance criteria, verification, files) lives in
 - [x] Checkpoint: bridge replay reproduces identical numbers (bit-for-bit)
 
 ## Phase 4: Random search
-- [ ] Task 18: engine/search/mutations.py
-- [ ] Task 19: engine/search/corpus.py
-- [ ] Task 20: engine/search/random_search.py
-- [ ] Task 21: engine/cli.py (run command)
-- [ ] Task 22: discovery test — random search finds exploit
-- [ ] Checkpoint: random search finds qualifying exploit within budget
+- [x] Task 18: engine/search/mutations.py
+- [x] Task 19: engine/search/corpus.py
+- [x] Task 20: engine/search/random_search.py
+- [x] Task 21: engine/cli.py (run command)
+- [x] Task 22: discovery test — random search finds exploit
+- [x] Checkpoint: random search finds qualifying exploit within budget (~165/2000 candidates, seed 1337)
 
 ## Phase 5: Economic guidance
 - [ ] Task 23: engine/search/novelty.py
