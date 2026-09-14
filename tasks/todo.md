@@ -1,0 +1,54 @@
+# Todo — DeFi Economic Exploit Discovery Engine
+
+Full task detail (acceptance criteria, verification, files) lives in
+`tasks/plan.md`. This file tracks completion state only.
+
+## Phase 1: Contracts foundation
+- [ ] Task 1: Repo scaffold (foundry.toml, layout)
+- [ ] Task 2: MockToken.sol + test
+- [ ] Task 3: ConstantProductAMM.sol + tests
+- [ ] Task 4: SpotOracle.sol + test
+- [ ] Task 5: FlashLender.sol + test
+- [ ] Task 6: LendingMarket.sol + tests
+- [ ] Task 7: AttackExecutor.sol + test
+- [ ] Checkpoint: `forge test` green on unit tests
+
+## Phase 2: Manual exploit
+- [ ] Task 8: Shared test fixture (deploy + seed)
+- [ ] Task 9: ManualExploit.t.sol (profit + bad debt asserted)
+- [ ] Checkpoint: manual exploit test green
+
+## Phase 3: Execution bridge
+- [ ] Task 10: Python scaffold
+- [ ] Task 11: engine/actions.py (DSL, encoding)
+- [ ] Task 12: engine/scenario.py + scenarios/vulnerable.json
+- [ ] Task 13: engine/deploy.py (Anvil + deploy-once + seed)
+- [ ] Task 14: engine/bridge.py (ExecutionBridge, StateGuard)
+- [ ] Task 15: engine/observer.py
+- [ ] Task 16: engine/evaluator.py (§7)
+- [ ] Task 17: replay Phase-2 exploit via bridge, numbers match
+- [ ] Checkpoint: bridge replay reproduces identical numbers
+
+## Phase 4: Random search
+- [ ] Task 18: engine/search/mutations.py
+- [ ] Task 19: engine/search/corpus.py
+- [ ] Task 20: engine/search/random_search.py
+- [ ] Task 21: engine/cli.py (run command)
+- [ ] Task 22: discovery test — random search finds exploit
+- [ ] Checkpoint: random search finds qualifying exploit within budget
+
+## Phase 5: Economic guidance
+- [ ] Task 23: engine/search/novelty.py
+- [ ] Task 24: engine/search/fitness.py
+- [ ] Task 25: engine/search/guided_search.py
+- [ ] Task 26: experiments/random_vs_guided.py (N=5 smoke)
+- [ ] Checkpoint: guided beats random, variance reported
+
+## Phase 6: Minimization, reporting, benchmark
+- [ ] Task 27: engine/minimizer.py
+- [ ] Task 28: engine/report.py (report.md via Jinja2)
+- [ ] Task 29: engine/solgen.py (ExploitReproducer.t.sol generator)
+- [ ] Task 30: wire full pipeline into CLI, end-to-end results/run_XXX
+- [ ] Task 31: experiments/benchmark.py (full §12 methodology, --fast mode)
+- [ ] Task 32 (stretch, optional): TWAPOracle + multi-block harness
+- [ ] Checkpoint: minimized attack + generated .t.sol passes forge test; benchmark table produced
