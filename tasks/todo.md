@@ -4,14 +4,14 @@ Full task detail (acceptance criteria, verification, files) lives in
 `tasks/plan.md`. This file tracks completion state only.
 
 ## Phase 1: Contracts foundation
-- [ ] Task 1: Repo scaffold (foundry.toml, layout)
-- [ ] Task 2: MockToken.sol + test
-- [ ] Task 3: ConstantProductAMM.sol + tests
-- [ ] Task 4: SpotOracle.sol + test
-- [ ] Task 5: FlashLender.sol + test
-- [ ] Task 6: LendingMarket.sol + tests
-- [ ] Task 7: AttackExecutor.sol + test
-- [ ] Checkpoint: `forge test` green on unit tests
+- [x] Task 1: Repo scaffold (foundry.toml, layout)
+- [x] Task 2: MockToken.sol + test
+- [x] Task 3: ConstantProductAMM.sol + tests
+- [x] Task 4: SpotOracle.sol + test
+- [x] Task 5: FlashLender.sol + test
+- [x] Task 6: LendingMarket.sol + tests
+- [x] Task 7: AttackExecutor.sol + test
+- [x] Checkpoint: `forge test` green on unit tests (36/36 passing)
 
 ## Phase 2: Manual exploit
 - [ ] Task 8: Shared test fixture (deploy + seed)
