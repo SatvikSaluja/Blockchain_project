@@ -1,0 +1,5 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "discovery: slow integration test that runs a real search against a live Anvil instance",
+]
