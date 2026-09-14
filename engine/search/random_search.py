@@ -11,7 +11,7 @@ import random
 from dataclasses import dataclass, field
 
 from engine.actions import Candidate
-from engine.bridge import ExecutionBridge
+from engine.bridge import ExecResult, ExecutionBridge
 from engine.evaluator import Evaluation, Evaluator
 from engine.observer import Observer
 from engine.search.mutations import ActionSpace, random_candidate
@@ -19,7 +19,7 @@ from engine.search.mutations import ActionSpace, random_candidate
 
 @dataclass
 class SearchResult:
-    exploits: list[tuple[Candidate, Evaluation]] = field(default_factory=list)
+    exploits: list[tuple[Candidate, Evaluation, ExecResult]] = field(default_factory=list)
     candidates_evaluated: int = 0
     # SPEC §12 primary metric: candidates evaluated before the first
     # qualifying exploit. None if the budget ran out without one.
@@ -46,14 +46,14 @@ def run_random_search(
         # SPEC §5 step order: submit -> capture receipt -> read state -> restore.
         exec_result = bridge.execute(candidate)
         state = observer.read()
-        ev = evaluator.evaluate(exec_result, state)
+        ev = evaluator.evaluate(candidate, exec_result, state)
         bridge.restore()
 
         result.candidates_evaluated = i
         if ev.is_exploit:
             if result.candidates_to_first_exploit is None:
                 result.candidates_to_first_exploit = i
-            result.exploits.append((candidate, ev))
+            result.exploits.append((candidate, ev, exec_result))
             if stop_on_first:
                 break
         # No corpus/fitness bookkeeping here by design (SPEC §6.3) — an

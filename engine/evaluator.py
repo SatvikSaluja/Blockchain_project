@@ -15,6 +15,7 @@ import math
 from dataclasses import dataclass
 from typing import Callable
 
+from engine.actions import Candidate
 from engine.bridge import ExecResult
 from engine.observer import EconState
 from engine.scenario import Scenario
@@ -22,10 +23,10 @@ from engine.scenario import Scenario
 GWEI = 10**9
 VIOLATED_PROPERTY = "debt_exceeds_collateral_at_reference_price"
 
-FitnessFn = Callable[[EconState, ExecResult, int, int], float]
+FitnessFn = Callable[[Candidate, EconState, ExecResult, int, int], float]
 
 
-def _default_fitness(state: EconState, result: ExecResult, profit_usd: int, bad_debt_usd: int) -> float:
+def _default_fitness(candidate: Candidate, state: EconState, result: ExecResult, profit_usd: int, bad_debt_usd: int) -> float:
     """Placeholder used until Phase 5 wires in the real weighted signal set
     (engine/search/fitness.py: price deviation, capacity/capital, bad debt,
     profit, novelty). Random search (Phase 4) never reads this field, so a
@@ -48,7 +49,7 @@ class Evaluator:
         self.scenario = scenario
         self.fitness_fn = fitness_fn
 
-    def evaluate(self, result: ExecResult, state: EconState) -> Evaluation:
+    def evaluate(self, candidate: Candidate, result: ExecResult, state: EconState) -> Evaluation:
         if result.reverted:
             # A reverted tx's state changes never persisted — not an
             # exploit, and not worth keeping in the corpus either.
@@ -71,7 +72,7 @@ class Evaluator:
         return Evaluation(
             is_exploit=is_exploit,
             is_interesting=not is_exploit,  # any executed, non-qualifying tx is worth exploring further
-            fitness=self.fitness_fn(state, result, profit_usd, bad_debt_usd),
+            fitness=self.fitness_fn(candidate, state, result, profit_usd, bad_debt_usd),
             attacker_profit_usd=profit_usd,
             protocol_bad_debt_usd=bad_debt_usd,
             violated_property=VIOLATED_PROPERTY if is_exploit else None,

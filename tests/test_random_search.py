@@ -43,7 +43,7 @@ class FakeEvaluator:
         self.exploit_at = exploit_at
         self.calls = 0
 
-    def evaluate(self, exec_result, state):
+    def evaluate(self, candidate, exec_result, state):
         self.calls += 1
         is_exploit = self.calls in self.exploit_at
         return Evaluation(
