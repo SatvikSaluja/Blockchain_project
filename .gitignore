@@ -1,0 +1,9 @@
+out/
+cache/
+broadcast/
+.env
+__pycache__/
+*.pyc
+.venv/
+engine.egg-info/
+results/run_*/
