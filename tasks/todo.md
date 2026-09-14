@@ -19,15 +19,15 @@ Full task detail (acceptance criteria, verification, files) lives in
 - [x] Checkpoint: manual exploit test green
 
 ## Phase 3: Execution bridge
-- [ ] Task 10: Python scaffold
-- [ ] Task 11: engine/actions.py (DSL, encoding)
-- [ ] Task 12: engine/scenario.py + scenarios/vulnerable.json
-- [ ] Task 13: engine/deploy.py (Anvil + deploy-once + seed)
-- [ ] Task 14: engine/bridge.py (ExecutionBridge, StateGuard)
-- [ ] Task 15: engine/observer.py
-- [ ] Task 16: engine/evaluator.py (§7)
-- [ ] Task 17: replay Phase-2 exploit via bridge, numbers match
-- [ ] Checkpoint: bridge replay reproduces identical numbers
+- [x] Task 10: Python scaffold
+- [x] Task 11: engine/actions.py (DSL, encoding)
+- [x] Task 12: engine/scenario.py + scenarios/vulnerable.json
+- [x] Task 13: engine/deploy.py (Anvil + deploy-once + seed)
+- [x] Task 14: engine/bridge.py (ExecutionBridge, StateGuard)
+- [x] Task 15: engine/observer.py
+- [x] Task 16: engine/evaluator.py (§7)
+- [x] Task 17: replay Phase-2 exploit via bridge, numbers match
+- [x] Checkpoint: bridge replay reproduces identical numbers (bit-for-bit)
 
 ## Phase 4: Random search
 - [ ] Task 18: engine/search/mutations.py
