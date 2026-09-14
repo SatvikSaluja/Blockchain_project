@@ -14,9 +14,9 @@ Full task detail (acceptance criteria, verification, files) lives in
 - [x] Checkpoint: `forge test` green on unit tests (36/36 passing)
 
 ## Phase 2: Manual exploit
-- [ ] Task 8: Shared test fixture (deploy + seed)
-- [ ] Task 9: ManualExploit.t.sol (profit + bad debt asserted)
-- [ ] Checkpoint: manual exploit test green
+- [x] Task 8: Shared test fixture (deploy + seed)
+- [x] Task 9: ManualExploit.t.sol (profit + bad debt asserted)
+- [x] Checkpoint: manual exploit test green
 
 ## Phase 3: Execution bridge
 - [ ] Task 10: Python scaffold
