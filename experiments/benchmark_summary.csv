@@ -1,0 +1,11 @@
+config,strategy,n,discovery_rate,mean_candidates_to_first_exploit,std_candidates_to_first_exploit,mean_wall_clock_s,mean_minimized_length
+baseline,random,3,0.0000,nan,nan,nan,
+baseline,guided,3,0.0000,nan,nan,nan,
+low_liquidity,random,3,0.0000,nan,nan,nan,
+low_liquidity,guided,3,0.0000,nan,nan,nan,
+high_flash_fee,random,3,0.0000,nan,nan,nan,
+high_flash_fee,guided,3,0.0000,nan,nan,nan,
+low_capital,random,3,0.0000,nan,nan,nan,
+low_capital,guided,3,0.0000,nan,nan,nan,
+patched_low_collateral_factor,random,3,0.0000,nan,nan,nan,
+patched_low_collateral_factor,guided,3,0.0000,nan,nan,nan,

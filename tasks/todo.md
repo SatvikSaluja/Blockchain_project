@@ -58,4 +58,11 @@ Full task detail (acceptance criteria, verification, files) lives in
       PASSES). Full checkpoint (benchmark table) needs Task 31.
 - [x] Task 31: experiments/benchmark.py (full §12 methodology, --fast mode)
 - [ ] Task 32 (stretch, optional): TWAPOracle + multi-block harness
-- [ ] Checkpoint: minimized attack + generated .t.sol passes forge test; benchmark table produced
+- [~] Checkpoint: minimized attack + generated .t.sol passes forge test (DONE)
+      ; benchmark table produced (DONE, but --fast/N=3/budget=300 shows 0%
+      everywhere — not enough budget to show the patched-control signal on
+      its own). See tasks/plan.md "Phase 6 status" for the full honest
+      writeup, including a targeted check that DOES show the patch working
+      (reference exploit reverts under it; search fails to find anything in
+      12x the budget that succeeds on baseline). Full N>=20 default-budget
+      run is a documented manual step.

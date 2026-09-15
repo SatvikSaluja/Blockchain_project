@@ -217,6 +217,35 @@ this comparison properly anyway per SPEC §12.
 **Checkpoint — Phase 6 (SPEC done-when):** minimized attack + auto-generated
 `.t.sol` passes `forge test`; benchmark table produced.
 
+**Phase 6 status.** First half fully met: a real end-to-end CLI run (seed
+1337, budget 200, `random` strategy) found and minimized a qualifying
+exploit and wrote a complete `results/run_001/` (scenario/attack/
+execution_trace/report.md/.t.sol); the generated
+`test/generated/ExploitReproducer_1337.t.sol` passes `forge test` and is
+committed as a permanent regression test. Found and fixed a real bug along
+the way: `build_execution_trace()` looked up a tx receipt after
+`bridge.restore()` had already reverted the chain (`TransactionNotFound`) —
+fixed the ordering.
+
+Second half (benchmark table) produced honestly but not fully powered: the
+committed `experiments/benchmark_results.md`/`benchmark_summary.csv` are a
+real `--fast` run (5 configs x 2 strategies x N=3, budget=300) — genuine
+data, not fabricated — but budget=300 is below what even the unpatched
+baseline typically needs (confirmed range ~165->5000 candidates depending on
+seed, per Phase 5's status above), so every cell reads 0% discovery. That
+table alone doesn't demonstrate the patched-control signal SPEC §12 wants.
+A separate, targeted check does: the exact reference exploit **reverts
+outright** against `patched_low_collateral_factor` (30% vs baseline's 75%),
+and random search with a seed that succeeds at candidate 165 on the
+baseline finds nothing in 2000 candidates (12x the budget) against the
+patch — see `benchmark_results.md`'s addendum for the full writeup. Same
+root cause as Phase 5: this is a shared, memory-constrained machine (several
+head-to-head attempts above budget ~1500 were OOM-killed), so the properly
+powered version of this table — N>=20 at the scenario's own default 50,000-
+candidate budget — is a documented manual step (`python -m
+experiments.benchmark --no-fast`), consistent with the plan's own risk
+mitigation for Task 31.
+
 ## Risks and Mitigations
 
 | Risk | Impact | Mitigation |
