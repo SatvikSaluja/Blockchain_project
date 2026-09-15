@@ -25,6 +25,15 @@ def test_smoke_run_against_vulnerable_scenario(tmp_path):
     assert "Evaluated 10 candidates" in result.output
 
 
+def test_guided_strategy_smoke_run(tmp_path):
+    result = runner.invoke(
+        app,
+        [str(SCENARIO_PATH), "--strategy", "guided", "--budget", "10", "--results-dir", str(tmp_path)],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Evaluated 10 candidates" in result.output
+
+
 def test_unsupported_strategy_rejected():
-    result = runner.invoke(app, [str(SCENARIO_PATH), "--strategy", "guided", "--budget", "1"])
+    result = runner.invoke(app, [str(SCENARIO_PATH), "--strategy", "bogus", "--budget", "1"])
     assert result.exit_code != 0

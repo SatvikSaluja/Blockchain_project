@@ -52,7 +52,10 @@ Full task detail (acceptance criteria, verification, files) lives in
 - [x] Task 27: engine/minimizer.py
 - [x] Task 28: engine/report.py (report.md via Jinja2)
 - [x] Task 29: engine/solgen.py (ExploitReproducer.t.sol generator)
-- [ ] Task 30: wire full pipeline into CLI, end-to-end results/run_XXX
+- [x] Task 30: wire full pipeline into CLI, end-to-end results/run_XXX
+- [x] Checkpoint (partial): minimized attack + generated .t.sol passes forge
+      test — verified end-to-end (run_001, seed 1337, ExploitReproducer_1337.t.sol
+      PASSES). Full checkpoint (benchmark table) needs Task 31.
 - [ ] Task 31: experiments/benchmark.py (full §12 methodology, --fast mode)
 - [ ] Task 32 (stretch, optional): TWAPOracle + multi-block harness
 - [ ] Checkpoint: minimized attack + generated .t.sol passes forge test; benchmark table produced
