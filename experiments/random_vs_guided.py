@@ -23,6 +23,7 @@ from web3 import Web3
 from engine.bridge import ExecutionBridge
 from engine.deploy import AnvilProcess, deploy_scenario
 from engine.evaluator import Evaluator
+from engine.minimizer import minimize
 from engine.observer import Observer
 from engine.scenario import Scenario
 from engine.search.fitness import WeightedFitness
@@ -45,9 +46,19 @@ class TrialResult:
     discovered: bool
     wall_clock_s: float
     exploit_count: int
+    minimized_length: Optional[int] = None  # SPEC §12 secondary metric; only set if minimize_after=True
 
 
-def _run_trial(strategy: str, seed: int, bridge: ExecutionBridge, observer: Observer, space: ActionSpace, scenario: Scenario, budget: int) -> TrialResult:
+def _run_trial(
+    strategy: str,
+    seed: int,
+    bridge: ExecutionBridge,
+    observer: Observer,
+    space: ActionSpace,
+    scenario: Scenario,
+    budget: int,
+    minimize_after: bool = False,
+) -> TrialResult:
     rng = random.Random(seed)
     start = time.monotonic()
 
@@ -67,6 +78,13 @@ def _run_trial(strategy: str, seed: int, bridge: ExecutionBridge, observer: Obse
         raise ValueError(f"unknown strategy {strategy!r}")
 
     elapsed = time.monotonic() - start
+
+    minimized_length = None
+    if minimize_after and result.exploits:
+        candidate, _ev, _exec_result = result.exploits[0]
+        minimized = minimize(bridge, evaluator, observer, candidate)
+        minimized_length = len(minimized.actions)
+
     return TrialResult(
         strategy=strategy,
         seed=seed,
@@ -74,15 +92,19 @@ def _run_trial(strategy: str, seed: int, bridge: ExecutionBridge, observer: Obse
         discovered=result.candidates_to_first_exploit is not None,
         wall_clock_s=elapsed,
         exploit_count=len(result.exploits),
+        minimized_length=minimized_length,
     )
 
 
-def run_head_to_head(scenario_path: Path, n_seeds: int, budget: int, base_seed: int = 0) -> list[TrialResult]:
+def run_head_to_head_scenario(
+    scenario: Scenario, n_seeds: int, budget: int, base_seed: int = 0, minimize_after: bool = False
+) -> list[TrialResult]:
     """One persistent Anvil + one deployment for the whole benchmark (SPEC
     §5) — every trial's ExecutionBridge.restore() call already guarantees a
     clean baseline before the next one, so redeploying per trial would just
-    be the same wasted-work mistake §5 warns against, one level up."""
-    scenario = Scenario.load(scenario_path)
+    be the same wasted-work mistake §5 warns against, one level up. Takes a
+    `Scenario` object directly so experiments/benchmark.py's parameter sweep
+    (Task 31) can run variants without round-tripping through a temp file."""
     results: list[TrialResult] = []
 
     with AnvilProcess() as anvil:
@@ -100,9 +122,16 @@ def run_head_to_head(scenario_path: Path, n_seeds: int, budget: int, base_seed: 
         for i in range(n_seeds):
             seed = base_seed + i
             for strategy in ("random", "guided"):
-                results.append(_run_trial(strategy, seed, bridge, observer, space, scenario, budget))
+                results.append(
+                    _run_trial(strategy, seed, bridge, observer, space, scenario, budget, minimize_after)
+                )
 
     return results
+
+
+def run_head_to_head(scenario_path: Path, n_seeds: int, budget: int, base_seed: int = 0) -> list[TrialResult]:
+    """Path-based convenience wrapper around run_head_to_head_scenario."""
+    return run_head_to_head_scenario(Scenario.load(scenario_path), n_seeds, budget, base_seed)
 
 
 def write_csv(results: list[TrialResult], out_path: Path) -> None:
@@ -110,11 +139,27 @@ def write_csv(results: list[TrialResult], out_path: Path) -> None:
     with out_path.open("w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(
-            ["strategy", "seed", "candidates_to_first_exploit", "discovered", "wall_clock_s", "exploit_count"]
+            [
+                "strategy",
+                "seed",
+                "candidates_to_first_exploit",
+                "discovered",
+                "wall_clock_s",
+                "exploit_count",
+                "minimized_length",
+            ]
         )
         for r in results:
             writer.writerow(
-                [r.strategy, r.seed, r.candidates_to_first_exploit, r.discovered, f"{r.wall_clock_s:.3f}", r.exploit_count]
+                [
+                    r.strategy,
+                    r.seed,
+                    r.candidates_to_first_exploit,
+                    r.discovered,
+                    f"{r.wall_clock_s:.3f}",
+                    r.exploit_count,
+                    r.minimized_length,
+                ]
             )
 
 

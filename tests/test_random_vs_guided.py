@@ -38,6 +38,7 @@ def test_head_to_head_produces_a_row_per_strategy_per_seed(tmp_path):
         "discovered",
         "wall_clock_s",
         "exploit_count",
+        "minimized_length",
     }
 
     summary = summarize(results)
