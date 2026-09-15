@@ -38,11 +38,15 @@ Full task detail (acceptance criteria, verification, files) lives in
 - [x] Checkpoint: random search finds qualifying exploit within budget (~165/2000 candidates, seed 1337)
 
 ## Phase 5: Economic guidance
-- [ ] Task 23: engine/search/novelty.py
-- [ ] Task 24: engine/search/fitness.py
-- [ ] Task 25: engine/search/guided_search.py
-- [ ] Task 26: experiments/random_vs_guided.py (N=5 smoke)
-- [ ] Checkpoint: guided beats random, variance reported
+- [x] Task 23: engine/search/novelty.py
+- [x] Task 24: engine/search/fitness.py
+- [x] Task 25: engine/search/guided_search.py
+- [x] Task 26: experiments/random_vs_guided.py (N=5 smoke)
+- [~] Checkpoint: guided beats random, variance reported — see
+      tasks/plan.md "Phase 5 status" for the honest empirical writeup: two
+      real bugs were found and fixed during validation, but a clean guided
+      win was NOT demonstrated at the budgets safely testable in this
+      session. Deferred to Phase 6's full-budget benchmark.
 
 ## Phase 6: Minimization, reporting, benchmark
 - [ ] Task 27: engine/minimizer.py

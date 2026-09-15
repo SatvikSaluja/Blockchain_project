@@ -1,7 +1,7 @@
 import random
 
 from engine.actions import MAX_ACTIONS, ActionType, AmountRule, Candidate
-from engine.search.mutations import MUTATIONS, ActionSpace, mutate, random_candidate
+from engine.search.mutations import ALL_MUTATIONS, ActionSpace, havoc, mutate, random_candidate
 
 SPACE = ActionSpace(
     usd="0x1000000000000000000000000000000000000001",
@@ -36,8 +36,16 @@ def test_all_mutations_always_produce_well_formed_candidates():
     rng = random.Random(2024)
     c = random_candidate(SPACE, rng)
     for _ in range(2000):
-        op = rng.choice(MUTATIONS)
+        op = rng.choice(ALL_MUTATIONS)
         c = op(c, rng, SPACE)
+        _assert_well_formed(c)
+
+
+def test_havoc_stacks_multiple_mutations_and_stays_well_formed():
+    rng = random.Random(5)
+    c = random_candidate(SPACE, rng)
+    for _ in range(200):
+        c = havoc(c, rng, SPACE)
         _assert_well_formed(c)
 
 

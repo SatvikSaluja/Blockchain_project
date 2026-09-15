@@ -1,0 +1,11 @@
+strategy,seed,candidates_to_first_exploit,discovered,wall_clock_s,exploit_count
+random,400,,False,31.881,0
+guided,400,,False,92.405,0
+random,401,,False,34.406,0
+guided,401,,False,73.520,0
+random,402,,False,26.293,0
+guided,402,,False,95.485,0
+random,403,,False,26.202,0
+guided,403,,False,112.491,0
+random,404,,False,28.431,0
+guided,404,,False,46.585,0

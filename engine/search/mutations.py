@@ -20,6 +20,24 @@ from engine.actions import MAX_ACTIONS, Action, ActionType, AmountRule, Candidat
 MAX_FIXED_AMOUNT = 10_000_000 * 10**18
 BPS_MAX = 10_000
 
+# Guided-search-only mutation operators occasionally snap an amount to a
+# boundary value (0%/100%, or min/max) instead of a mid-range draw. This is
+# a generic search heuristic (boundary values are disproportionately likely
+# to matter — same idea property-based-testing shrinkers use), not anything
+# specific to this scenario's numbers. random_candidate()/random_action()
+# (the honest baseline random_search.py uses) never apply it — see SPEC §6.3
+# "must share the exact same execution path... as the guided search," which
+# is about the *path*, not a ban on guided's mutation logic being smarter.
+BOUNDARY_BIAS = 0.3
+# Within a boundary snap, favor the MAX end: a near-zero amount/flash-size is
+# essentially always a no-op (too small to move price or matter), so it
+# carries far less information than the max end even as a generic heuristic.
+BOUNDARY_MAX_WEIGHT = 0.85
+
+
+def _boundary_value(low: int, high: int, rng: random.Random) -> int:
+    return high if rng.random() < BOUNDARY_MAX_WEIGHT else low
+
 # Each swap/deposit-withdraw/borrow-repay pair shares one target contract, so
 # flipping within a pair never needs a different `target`.
 _OPPOSITE = {
@@ -52,20 +70,24 @@ class ActionSpace:
         return (self.usd, self.col)
 
 
-def _random_amount_param(rule: AmountRule, rng: random.Random) -> int:
+def _random_amount_param(rule: AmountRule, rng: random.Random, boundary_bias: float = 0.0) -> int:
     if rule == AmountRule.FIXED:
+        if boundary_bias and rng.random() < boundary_bias:
+            return _boundary_value(0, MAX_FIXED_AMOUNT, rng)
         return rng.randint(0, MAX_FIXED_AMOUNT)
+    if boundary_bias and rng.random() < boundary_bias:
+        return _boundary_value(1, BPS_MAX, rng)
     return rng.randint(1, BPS_MAX)
 
 
-def random_action(space: ActionSpace, rng: random.Random) -> Action:
+def random_action(space: ActionSpace, rng: random.Random, boundary_bias: float = 0.0) -> Action:
     action_type = rng.choice(list(ActionType))
     amount_rule = rng.choice(list(AmountRule))
     return Action(
         action_type=action_type,
         target=space.target_for(action_type),
         amount_rule=amount_rule,
-        amount_param=_random_amount_param(amount_rule, rng),
+        amount_param=_random_amount_param(amount_rule, rng, boundary_bias),
     )
 
 
@@ -83,16 +105,20 @@ def random_candidate(space: ActionSpace, rng: random.Random, max_actions: int = 
 # --- Mutation operators. Each: (Candidate, Random, ActionSpace) -> Candidate.
 
 def perturb_amount(c: Candidate, rng: random.Random, space: ActionSpace) -> Candidate:
-    """Nudge one action's amount_param (± up to 50%, or resample bps)."""
+    """Nudge one action's amount_param (± up to 50%, or resample bps —
+    occasionally snapped to a boundary; see BOUNDARY_BIAS)."""
     if not c.actions:
         return c
     i = rng.randrange(len(c.actions))
     a = c.actions[i]
     if a.amount_rule == AmountRule.FIXED:
-        factor = rng.uniform(0.5, 1.5)
-        new_param = max(0, int(a.amount_param * factor))
+        if rng.random() < BOUNDARY_BIAS:
+            new_param = _boundary_value(0, MAX_FIXED_AMOUNT, rng)
+        else:
+            factor = rng.uniform(0.5, 1.5)
+            new_param = max(0, int(a.amount_param * factor))
     else:
-        new_param = rng.randint(1, BPS_MAX)
+        new_param = _random_amount_param(a.amount_rule, rng, BOUNDARY_BIAS)
     actions = c.actions[:i] + (dataclasses.replace(a, amount_param=new_param),) + c.actions[i + 1 :]
     return dataclasses.replace(c, actions=actions)
 
@@ -105,10 +131,9 @@ def change_amount_rule(c: Candidate, rng: random.Random, space: ActionSpace) -> 
     a = c.actions[i]
     if a.amount_rule == AmountRule.FIXED:
         new_rule = rng.choice([AmountRule.PCT_BALANCE, AmountRule.FRAC_RESERVES, AmountRule.PCT_BORROW_CAPACITY])
-        new_param = rng.randint(1, BPS_MAX)
     else:
         new_rule = AmountRule.FIXED
-        new_param = rng.randint(0, MAX_FIXED_AMOUNT)
+    new_param = _random_amount_param(new_rule, rng, BOUNDARY_BIAS)
     new_action = dataclasses.replace(a, amount_rule=new_rule, amount_param=new_param)
     actions = c.actions[:i] + (new_action,) + c.actions[i + 1 :]
     return dataclasses.replace(c, actions=actions)
@@ -119,7 +144,7 @@ def insert_action(c: Candidate, rng: random.Random, space: ActionSpace) -> Candi
     if len(c.actions) >= MAX_ACTIONS:
         return c
     pos = rng.randint(0, len(c.actions))
-    new_action = random_action(space, rng)
+    new_action = random_action(space, rng, BOUNDARY_BIAS)
     actions = c.actions[:pos] + (new_action,) + c.actions[pos:]
     return dataclasses.replace(c, actions=actions)
 
@@ -156,9 +181,12 @@ def retarget(c: Candidate, rng: random.Random, space: ActionSpace) -> Candidate:
 
 
 def perturb_flash_amount(c: Candidate, rng: random.Random, space: ActionSpace) -> Candidate:
-    """Resize the outer flash loan."""
-    factor = rng.uniform(0.5, 1.5)
-    new_amount = max(1, int(c.flash_amount * factor))
+    """Resize the outer flash loan (occasionally snapped to a boundary)."""
+    if rng.random() < BOUNDARY_BIAS:
+        new_amount = _boundary_value(1, MAX_FIXED_AMOUNT, rng)
+    else:
+        factor = rng.uniform(0.5, 1.5)
+        new_amount = max(1, int(c.flash_amount * factor))
     return dataclasses.replace(c, flash_amount=new_amount)
 
 
@@ -172,8 +200,29 @@ MUTATIONS = (
     perturb_flash_amount,
 )
 
+# A qualifying candidate typically needs several dimensions (a couple of
+# action amounts AND the flash size) to land right *simultaneously* — a
+# single-mutation step changes only one dimension, so it can wander a
+# multi-dimensional target forever without ever landing on it in one shot.
+# Havoc stacking (apply 2-4 mutations per step) is the standard fuzzing
+# answer to exactly this (AFL's "havoc" stage) — still generic, still never
+# steers action *structure* toward the answer, just widens the step size.
+HAVOC_MIN_STACK = 2
+HAVOC_MAX_STACK = 4
+
+
+def havoc(c: Candidate, rng: random.Random, space: ActionSpace) -> Candidate:
+    """Apply several of the other operators back-to-back in one step."""
+    for _ in range(rng.randint(HAVOC_MIN_STACK, HAVOC_MAX_STACK)):
+        op = rng.choice(MUTATIONS)
+        c = op(c, rng, space)
+    return c
+
+
+ALL_MUTATIONS = MUTATIONS + (havoc,)
+
 
 def mutate(c: Candidate, rng: random.Random, space: ActionSpace, weights: tuple[float, ...] | None = None) -> Candidate:
     """Pick one operator by weighted RNG (SPEC §6.2) and apply it."""
-    op = rng.choices(MUTATIONS, weights=weights, k=1)[0]
+    op = rng.choices(ALL_MUTATIONS, weights=weights, k=1)[0]
     return op(c, rng, space)

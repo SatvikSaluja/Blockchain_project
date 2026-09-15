@@ -35,16 +35,35 @@ class WeightedFitness:
         self.novelty_tracker = novelty_tracker
 
     def __call__(
-        self, candidate: Candidate, state: EconState, result: ExecResult, profit_usd: int, bad_debt_usd: int
+        self, candidate: Candidate, state: EconState, result: ExecResult, _profit_usd: int, bad_debt_usd: int
     ) -> float:
+        # `_profit_usd` (Evaluator's net-of-initial-capital number) is part
+        # of the FitnessFn protocol but deliberately unused here — see
+        # _raw_captured_usd's docstring.
         w = self.weights
         return (
             w.price_deviation * self._price_deviation(state)
             + w.capacity_per_capital * self._capacity_per_capital(candidate, state)
             + w.bad_debt * (bad_debt_usd / self.capital_scale)
-            + w.profit * (profit_usd / self.capital_scale)
+            + w.profit * (self._raw_captured_usd(state) / self.capital_scale)
             + w.novelty * self.novelty_tracker.score(state)
         )
+
+    def _raw_captured_usd(self, state: EconState) -> int:
+        """"progress toward profit" (§6.4), NOT Evaluator's net profit_usd.
+
+        Evaluator's profit_usd deducts initial_capital_usd — a near-constant
+        ~-capital_scale for every candidate that hasn't yet closed the full
+        flash-loan loop, since it hasn't captured anything back. Reusing
+        that number here would give every non-qualifying candidate almost
+        the same deeply-negative fitness regardless of real progress,
+        drowning out the signal fitness is supposed to provide (verified
+        empirically: it made every unevaluated placeholder-fitness seed
+        permanently outrank every genuine discovery). Raw captured USD
+        floors at 0 for "nothing captured yet" and rises with real
+        progress, which is what a ranking signal needs.
+        """
+        return state.attacker_usd + (state.attacker_col * state.reference_price) // 10**18
 
     def _price_deviation(self, state: EconState) -> float:
         """|oracle_price - reference_price| / reference_price."""

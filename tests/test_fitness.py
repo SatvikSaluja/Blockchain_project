@@ -70,8 +70,8 @@ def test_capacity_per_capital_is_zero_when_no_capital_deployed():
 
 def test_novelty_component_drops_to_zero_on_repeated_state():
     fitness = _fitness()
-    first = fitness(CANDIDATE, BASELINE, EXEC_RESULT, profit_usd=0, bad_debt_usd=0)
-    second = fitness(CANDIDATE, BASELINE, EXEC_RESULT, profit_usd=0, bad_debt_usd=0)
+    first = fitness(CANDIDATE, BASELINE, EXEC_RESULT, _profit_usd=0, bad_debt_usd=0)
+    second = fitness(CANDIDATE, BASELINE, EXEC_RESULT, _profit_usd=0, bad_debt_usd=0)
     # Same state seen twice -> novelty contributes on the first call only.
     assert first > second
 
@@ -79,16 +79,27 @@ def test_novelty_component_drops_to_zero_on_repeated_state():
 def test_combined_weighted_sum_matches_hand_computation():
     scenario = Scenario.load(SCENARIO_PATH)
     fitness = _fitness(scenario)
-    state = EconState(**{**BASELINE.__dict__, "oracle_price": 2 * 10**18, "collateral_col": 100_000 * 10**18, "debt_usd": 50_000 * 10**18})
+    state = EconState(
+        **{
+            **BASELINE.__dict__,
+            "oracle_price": 2 * 10**18,
+            "collateral_col": 100_000 * 10**18,
+            "debt_usd": 50_000 * 10**18,
+            "attacker_usd": 20_000 * 10**18,  # raw captured USD, NOT net-of-capital profit
+        }
+    )
 
-    score = fitness(CANDIDATE, state, EXEC_RESULT, profit_usd=20_000 * 10**18, bad_debt_usd=30_000 * 10**18)
+    # profit_usd param is Evaluator's net-of-initial-capital number — deliberately
+    # NOT what the "profit" fitness signal uses (see fitness.py); pass something
+    # implausible to prove the function really ignores it.
+    score = fitness(CANDIDATE, state, EXEC_RESULT, _profit_usd=-999 * 10**18, bad_debt_usd=30_000 * 10**18)
 
     w = scenario.search.fitness_weights
     expected = (
         w.price_deviation * 1.0  # price doubled
         + w.capacity_per_capital * 2.0  # 100_000 capacity / 50_000 capital
         + w.bad_debt * 3.0  # 30_000 bad debt / 10_000 initial capital
-        + w.profit * 2.0  # 20_000 profit / 10_000 initial capital
+        + w.profit * 2.0  # 20_000 raw captured USD / 10_000 initial capital
         + w.novelty * 1.0  # first sighting of this bucket
     )
     assert score == pytest.approx(expected)

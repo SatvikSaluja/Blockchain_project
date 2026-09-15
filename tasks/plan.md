@@ -141,6 +141,49 @@ exploit within budget on the vulnerable config.
 rate / candidates-to-first-exploit, variance reported (from the N=5 smoke run
 at minimum; full N≥20 happens in Phase 6 benchmarking).
 
+**Phase 5 status (honest writeup).** The mechanism is built and unit-tested
+(novelty bucketing, weighted fitness, softmax+epsilon selection, corpus
+dedupe) — all green. Empirical validation surfaced two real bugs, both fixed:
+
+1. **Corpus stagnation.** `seed_corpus()` gives every initial seed a
+   placeholder `fitness=0.0` without ever executing them. Evaluator's
+   `profit_usd` (used naively as fitness's "profit" signal) is net of
+   `initial_capital_usd`, so it floors around `-2.0` (weighted) for any
+   candidate that hasn't yet closed the full flash-loan loop — meaning every
+   genuinely-discovered non-reverting candidate scored *worse* than the
+   never-executed placeholder seeds, so weighted selection just re-picked the
+   same 25 static seeds forever (verified: corpus size stuck at 25 after
+   1000 candidates). Fixed in `fitness.py` by scoring "profit" from raw
+   captured USD (`state.attacker_usd + col-in-usd`), which floors at 0 and
+   rises with real progress, instead of Evaluator's net-of-capital number.
+2. **Mutation step size vs. a narrow target.** For this scenario, a
+   qualifying sequence needs several dimensions to land right
+   *simultaneously* — e.g. the reference shape only works for
+   `flash_amount` in roughly `[380k, 470k)` (verified by sweep; `300k` and
+   `500k` both revert) *and* near-100% bps at each step. Single-dimension
+   mutation steps rarely land a multi-dimensional target at once. Mitigated
+   with a generic boundary-value bias (bps rules snap toward 0%/100% some of
+   the time — a percentage has a real extreme, unlike an unbounded FIXED
+   amount) and an AFL-style `havoc` operator that stacks 2-4 mutations per
+   step. Confirmed to fix corpus stagnation (25 → 80-340+ members observed
+   across runs) but not sufficient on its own to reliably close the gap at
+   small budgets.
+
+**What wasn't achieved:** a clean "guided beats random" result at budgets
+safely runnable in this session. This machine is a shared, memory-constrained
+box (multiple concurrent Claude Code sessions observed via `ps`); several
+head-to-head attempts at budget ≥1500 were OOM-killed mid-run, so the
+evidence that exists is from smaller, safe budgets (800-2500, a handful of
+seeds): pre-fix, guided was strictly worse (0/5 vs random's 1/5); post-fix,
+results are tied (0/3 vs 0/3, 0/5 vs 0/5) rather than a guided win. Given
+random search itself needs anywhere from ~165 to >5000 candidates depending
+on seed (high variance, confirmed empirically), and `scenarios/vulnerable.json`
+is deliberately configured with a 50,000-candidate default budget — 10-100x
+more than tested here — this is most honestly read as **inconclusive at
+small budgets**, not a disproof of the guidance mechanism. The real
+resolution is Phase 6's own full-budget, N≥20 benchmark, which needs to run
+this comparison properly anyway per SPEC §12.
+
 ### Phase 6: Minimization, reporting, benchmark
 
 - [ ] Task 27: `engine/minimizer.py` — delta-minimize (remove actions →
