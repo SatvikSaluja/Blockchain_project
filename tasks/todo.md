@@ -56,6 +56,6 @@ Full task detail (acceptance criteria, verification, files) lives in
 - [x] Checkpoint (partial): minimized attack + generated .t.sol passes forge
       test — verified end-to-end (run_001, seed 1337, ExploitReproducer_1337.t.sol
       PASSES). Full checkpoint (benchmark table) needs Task 31.
-- [ ] Task 31: experiments/benchmark.py (full §12 methodology, --fast mode)
+- [x] Task 31: experiments/benchmark.py (full §12 methodology, --fast mode)
 - [ ] Task 32 (stretch, optional): TWAPOracle + multi-block harness
 - [ ] Checkpoint: minimized attack + generated .t.sol passes forge test; benchmark table produced
