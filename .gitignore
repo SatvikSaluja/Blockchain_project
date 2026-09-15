@@ -7,3 +7,7 @@ __pycache__/
 .venv/
 engine.egg-info/
 results/run_*/
+# run_001 is checked in on purpose: the concrete evidence behind the
+# README's "Primary result" claim, so it's readable without rerunning anything.
+!results/run_001/
+!results/run_001/**

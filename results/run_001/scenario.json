@@ -1,0 +1,21 @@
+{
+  "seed": 1337,
+  "amm": { "reserveUsd": "1000000e18", "reserveCol": "1000000e18", "feeBps": 0 },
+  "lending": { "usdLiquidity": "500000e18", "collateralFactorBps": 7500 },
+  "flash": { "feeBps": 9 },
+  "attacker": { "initialCapitalUsd": "10000e18" },
+  "evaluator": { "referencePriceUsd": "1e18" },
+  "gas": { "gasPriceGwei": 20, "ethPriceUsd": "3000e18" },
+  "search": {
+    "maxActions": 6,
+    "budgetCandidates": 50000,
+    "fitnessWeights": {
+      "priceDeviation": 1.0,
+      "capacityPerCapital": 1.0,
+      "badDebt": 2.0,
+      "profit": 2.0,
+      "novelty": 0.5
+    },
+    "selectionEpsilon": 0.1
+  }
+}

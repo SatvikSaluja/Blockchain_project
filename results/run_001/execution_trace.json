@@ -1,0 +1,102 @@
+[
+  {
+    "index": 0,
+    "actionType": "SWAP_USD_FOR_COL",
+    "resolvedAmount": "287493613370913236566272",
+    "preState": {
+      "attackerUsd": 0,
+      "attackerCol": 0,
+      "reserveUsd": 1000000000000000000000000,
+      "reserveCol": 1000000000000000000000000,
+      "oraclePrice": 1000000000000000000,
+      "referencePrice": 1000000000000000000,
+      "debtUsd": 0,
+      "collateralCol": 0
+    },
+    "postState": {
+      "attackerUsd": 0,
+      "attackerCol": 223297118047986293035826,
+      "reserveUsd": 1287493613370913236566272,
+      "reserveCol": 776702881952013706964174,
+      "oraclePrice": 1657639804470890615,
+      "referencePrice": 1000000000000000000,
+      "debtUsd": 0,
+      "collateralCol": 0
+    }
+  },
+  {
+    "index": 1,
+    "actionType": "DEPOSIT_COL",
+    "resolvedAmount": "55801949800191774629652",
+    "preState": {
+      "attackerUsd": 0,
+      "attackerCol": 223297118047986293035826,
+      "reserveUsd": 1287493613370913236566272,
+      "reserveCol": 776702881952013706964174,
+      "oraclePrice": 1657639804470890615,
+      "referencePrice": 1000000000000000000,
+      "debtUsd": 0,
+      "collateralCol": 0
+    },
+    "postState": {
+      "attackerUsd": 0,
+      "attackerCol": 167495168247794518406174,
+      "reserveUsd": 1287493613370913236566272,
+      "reserveCol": 776702881952013706964174,
+      "oraclePrice": 1657639804470890615,
+      "referencePrice": 1000000000000000000,
+      "debtUsd": 0,
+      "collateralCol": 55801949800191774629652
+    }
+  },
+  {
+    "index": 2,
+    "actionType": "BORROW_USD",
+    "resolvedAmount": "69374649866913260189339",
+    "preState": {
+      "attackerUsd": 0,
+      "attackerCol": 167495168247794518406174,
+      "reserveUsd": 1287493613370913236566272,
+      "reserveCol": 776702881952013706964174,
+      "oraclePrice": 1657639804470890615,
+      "referencePrice": 1000000000000000000,
+      "debtUsd": 0,
+      "collateralCol": 55801949800191774629652
+    },
+    "postState": {
+      "attackerUsd": 69374649866913260189339,
+      "attackerCol": 167495168247794518406174,
+      "reserveUsd": 1287493613370913236566272,
+      "reserveCol": 776702881952013706964174,
+      "oraclePrice": 1657639804470890615,
+      "referencePrice": 1000000000000000000,
+      "debtUsd": 69374649866913260189339,
+      "collateralCol": 55801949800191774629652
+    }
+  },
+  {
+    "index": 3,
+    "actionType": "SWAP_COL_FOR_USD",
+    "resolvedAmount": "167495168247794518406174",
+    "preState": {
+      "attackerUsd": 69374649866913260189339,
+      "attackerCol": 167495168247794518406174,
+      "reserveUsd": 1287493613370913236566272,
+      "reserveCol": 776702881952013706964174,
+      "oraclePrice": 1657639804470890615,
+      "referencePrice": 1000000000000000000,
+      "debtUsd": 69374649866913260189339,
+      "collateralCol": 55801949800191774629652
+    },
+    "postState": {
+      "attackerUsd": 297768427362945012618026,
+      "attackerCol": 0,
+      "reserveUsd": 1059099835874881484137585,
+      "reserveCol": 944198050199808225370348,
+      "oraclePrice": 1121692462350200896,
+      "referencePrice": 1000000000000000000,
+      "debtUsd": 69374649866913260189339,
+      "collateralCol": 55801949800191774629652
+    }
+  }
+]

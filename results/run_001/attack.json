@@ -1,0 +1,38 @@
+{
+  "flashToken": "USD",
+  "flashAmount": "287493613370913236566272",
+  "actions": [
+    {
+      "type": "SWAP_USD_FOR_COL",
+      "target": "AMM",
+      "rule": "FRAC_RESERVES",
+      "param": 5000
+    },
+    {
+      "type": "DEPOSIT_COL",
+      "target": "LENDING",
+      "rule": "PCT_BALANCE",
+      "param": 2499
+    },
+    {
+      "type": "BORROW_USD",
+      "target": "LENDING",
+      "rule": "FIXED",
+      "param": 69376509137436895346688
+    },
+    {
+      "type": "SWAP_COL_FOR_USD",
+      "target": "AMM",
+      "rule": "FIXED",
+      "param": 167495168247794518406174
+    }
+  ],
+  "result": {
+    "attackerProfitUsd": "719997954138845",
+    "protocolBadDebtUsd": "13572700066721485559687",
+    "violatedProperty": "debt_exceeds_collateral_at_reference_price",
+    "gasUsed": 267817,
+    "candidatesToDiscovery": 165,
+    "seed": 1337
+  }
+}
