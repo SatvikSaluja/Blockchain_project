@@ -15,61 +15,17 @@ from typing import Optional
 import typer
 from web3 import Web3
 
-from engine.actions import Candidate
-from engine.deploy import AnvilProcess, Deployment, deploy_scenario
+from engine.deploy import AnvilProcess, deploy_scenario
 from engine.bridge import ExecutionBridge
-from engine.evaluator import Evaluation, Evaluator
+from engine.evaluator import Evaluator
 from engine.observer import Observer
+from engine.report import candidate_to_dict
 from engine.scenario import Scenario
 from engine.search.mutations import ActionSpace
 from engine.search.random_search import run_random_search
 
 app = typer.Typer(help="DeFi economic exploit discovery engine (SPEC.md).")
 REPO_ROOT = Path(__file__).resolve().parent.parent
-
-
-def _symbol(address: str, deployment: Deployment) -> str:
-    """Human-readable label for an address in attack.json, matching the
-    SPEC Appendix example ("USD", "AMM", ...) instead of raw hex."""
-    table = {
-        deployment.usd.address: "USD",
-        deployment.col.address: "COL",
-        deployment.amm.address: "AMM",
-        deployment.lending.address: "LENDING",
-    }
-    return table.get(address, address)
-
-
-def candidate_to_dict(
-    candidate: Candidate,
-    deployment: Deployment,
-    evaluation: Evaluation,
-    gas_used: int,
-    seed: int,
-    candidates_to_discovery: Optional[int],
-) -> dict:
-    """SPEC Appendix attack.json shape."""
-    return {
-        "flashToken": _symbol(candidate.flash_token, deployment),
-        "flashAmount": str(candidate.flash_amount),
-        "actions": [
-            {
-                "type": a.action_type.name,
-                "target": _symbol(a.target, deployment),
-                "rule": a.amount_rule.name,
-                "param": a.amount_param,
-            }
-            for a in candidate.actions
-        ],
-        "result": {
-            "attackerProfitUsd": str(evaluation.attacker_profit_usd),
-            "protocolBadDebtUsd": str(evaluation.protocol_bad_debt_usd),
-            "violatedProperty": evaluation.violated_property,
-            "gasUsed": gas_used,
-            "candidatesToDiscovery": candidates_to_discovery,
-            "seed": seed,
-        },
-    }
 
 
 def _next_run_dir(results_dir: Path) -> Path:
