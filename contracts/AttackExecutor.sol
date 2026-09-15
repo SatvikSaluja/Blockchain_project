@@ -34,6 +34,23 @@ contract AttackExecutor is IFlashLoanReceiver {
         uint256 amountParam; // absolute amount OR bps, per rule
     }
 
+    /// @notice Per-action trace record (SPEC §9 execution_trace.json). Emitted
+    /// after each action so the Python side can reconstruct pre/post state
+    /// for every step of a single atomic transaction — `preState` for index
+    /// i is just index i-1's post-state (or the pre-tx baseline for i=0).
+    event ActionExecuted(
+        uint256 index,
+        uint8 actionType,
+        uint256 resolvedAmount,
+        uint256 attackerUsd,
+        uint256 attackerCol,
+        uint256 reserveUsd,
+        uint256 reserveCol,
+        uint256 oraclePrice,
+        uint256 debtUsd,
+        uint256 collateralCol
+    );
+
     uint256 public constant MAX_ACTIONS = 6;
 
     ConstantProductAMM public immutable amm;
@@ -73,46 +90,59 @@ contract AttackExecutor is IFlashLoanReceiver {
         Action[] memory actions = abi.decode(data, (Action[]));
 
         for (uint256 i = 0; i < actions.length; i++) {
-            _run(actions[i]);
+            uint256 resolvedAmount = _run(actions[i]);
+            (uint256 rUsd, uint256 rCol) = amm.getReserves();
+            emit ActionExecuted(
+                i,
+                actions[i].actionType,
+                resolvedAmount,
+                usd.balanceOf(address(this)),
+                col.balanceOf(address(this)),
+                rUsd,
+                rCol,
+                oracle.price(),
+                lending.debtOf(address(this)),
+                lending.collateralOf(address(this))
+            );
         }
 
         require(IERC20(token).transfer(address(flashLender), amount + fee), "AttackExecutor: repay failed");
     }
 
-    function _run(Action memory a) internal {
+    function _run(Action memory a) internal returns (uint256 amt) {
         ActionType t = ActionType(a.actionType);
         AmountRule r = AmountRule(a.amountRule);
 
         if (t == ActionType.SWAP_USD_FOR_COL) {
             require(a.target == address(amm), "AttackExecutor: bad target");
             (uint256 rUsd,) = amm.getReserves();
-            uint256 amt = _min(_resolve(r, a.amountParam, usd, rUsd), usd.balanceOf(address(this)));
+            amt = _min(_resolve(r, a.amountParam, usd, rUsd), usd.balanceOf(address(this)));
             if (amt > 0) amm.swapUsdForCol(amt);
         } else if (t == ActionType.SWAP_COL_FOR_USD) {
             require(a.target == address(amm), "AttackExecutor: bad target");
             (, uint256 rCol) = amm.getReserves();
-            uint256 amt = _min(_resolve(r, a.amountParam, col, rCol), col.balanceOf(address(this)));
+            amt = _min(_resolve(r, a.amountParam, col, rCol), col.balanceOf(address(this)));
             if (amt > 0) amm.swapColForUsd(amt);
         } else if (t == ActionType.DEPOSIT_COL) {
             require(a.target == address(lending), "AttackExecutor: bad target");
             (, uint256 rCol) = amm.getReserves();
-            uint256 amt = _min(_resolve(r, a.amountParam, col, rCol), col.balanceOf(address(this)));
+            amt = _min(_resolve(r, a.amountParam, col, rCol), col.balanceOf(address(this)));
             if (amt > 0) lending.depositCollateral(amt);
         } else if (t == ActionType.BORROW_USD) {
             require(a.target == address(lending), "AttackExecutor: bad target");
             (uint256 rUsd,) = amm.getReserves();
-            uint256 amt = _min(_resolve(r, a.amountParam, usd, rUsd), _borrowCapacity());
+            amt = _min(_resolve(r, a.amountParam, usd, rUsd), _borrowCapacity());
             if (amt > 0) lending.borrow(amt);
         } else if (t == ActionType.REPAY_USD) {
             require(a.target == address(lending), "AttackExecutor: bad target");
             (uint256 rUsd,) = amm.getReserves();
-            uint256 amt = _min(_resolve(r, a.amountParam, usd, rUsd), usd.balanceOf(address(this)));
+            amt = _min(_resolve(r, a.amountParam, usd, rUsd), usd.balanceOf(address(this)));
             if (amt > 0) lending.repay(amt);
         } else {
             // WITHDRAW_COL
             require(a.target == address(lending), "AttackExecutor: bad target");
             (, uint256 rCol) = amm.getReserves();
-            uint256 amt = _min(_resolve(r, a.amountParam, col, rCol), lending.collateralOf(address(this)));
+            amt = _min(_resolve(r, a.amountParam, col, rCol), lending.collateralOf(address(this)));
             if (amt > 0) lending.withdrawCollateral(amt);
         }
     }
