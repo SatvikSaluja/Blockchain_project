@@ -22,6 +22,7 @@ The full N>=20, scenario-default-budget run is a documented manual step:
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
@@ -106,21 +107,44 @@ def _summarize_config(config: str, strategy: str, results: list[TrialResult]) ->
 
 
 def run_benchmark(
-    scenario_path: Path, n_seeds: int, budget: int, base_seed: int = 0, minimize_after: bool = True
+    scenario_path: Path,
+    n_seeds: int,
+    budget: int,
+    base_seed: int = 0,
+    minimize_after: bool = True,
+    out_dir: Optional[Path] = None,
 ) -> tuple[list[TrialResult], list[ConfigSummary]]:
     base = Scenario.load(scenario_path)
     all_results: list[TrialResult] = []
     summaries: list[ConfigSummary] = []
 
     for config_name, transform in CONFIGS.items():
+        t0 = time.monotonic()
         scenario = transform(base)
         results = run_head_to_head_scenario(scenario, n_seeds, budget, base_seed, minimize_after=minimize_after)
-        for r in results:
-            all_results.append(r)
+        all_results.extend(results)
         for strategy in ("random", "guided"):
             summaries.append(_summarize_config(config_name, strategy, results))
 
+        typer.echo(
+            f"[{config_name}] done in {(time.monotonic() - t0) / 60:.1f} min, "
+            f"{sum(r.discovered for r in results)}/{len(results)} trials discovered"
+        )
+        # Checkpoint after every config: this machine has a documented OOM
+        # history (tasks/plan.md, Phase 5 status) — a killed run loses at
+        # most the in-progress config's trials, never the whole sweep.
+        if out_dir is not None:
+            _write_outputs(all_results, summaries, out_dir)
+
     return all_results, summaries
+
+
+def _write_outputs(all_results: list[TrialResult], summaries: list[ConfigSummary], out_dir: Path) -> None:
+    table = render_markdown_table(summaries)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "benchmark_results.md").write_text("# Benchmark Results (SPEC §12)\n\n" + table + "\n")
+    write_csv(all_results, out_dir / "benchmark_raw.csv")
+    write_summary_csv(summaries, out_dir / "benchmark_summary.csv")
 
 
 def render_markdown_table(summaries: list[ConfigSummary]) -> str:
@@ -187,14 +211,11 @@ def main(
         budget = 300 if fast else Scenario.load(scenario_path).search.budget_candidates
 
     typer.echo(f"Benchmarking {len(CONFIGS)} configs x 2 strategies x {n_seeds} seeds, budget={budget}...")
-    all_results, summaries = run_benchmark(scenario_path, n_seeds, budget, base_seed, minimize_after=minimize)
+    all_results, summaries = run_benchmark(
+        scenario_path, n_seeds, budget, base_seed, minimize_after=minimize, out_dir=out_dir
+    )
 
-    table = render_markdown_table(summaries)
-    typer.echo(table)
-
-    (out_dir / "benchmark_results.md").write_text("# Benchmark Results (SPEC §12)\n\n" + table + "\n")
-    write_csv(all_results, out_dir / "benchmark_raw.csv")
-    write_summary_csv(summaries, out_dir / "benchmark_summary.csv")
+    typer.echo(render_markdown_table(summaries))
     typer.echo(f"wrote {out_dir / 'benchmark_results.md'}, benchmark_raw.csv, benchmark_summary.csv")
 
 
