@@ -11,3 +11,4 @@ results/run_*/
 # README's "Primary result" claim, so it's readable without rerunning anything.
 !results/run_001/
 !results/run_001/**
+experiments/full_benchmark_run.log
