@@ -72,7 +72,18 @@ class ExecutionBridge:
         except Exception as exc:  # node rejected before mining (e.g. eth_call pre-check)
             return ExecResult(reverted=True, gas_used=0, tx_hash=None, revert_reason=str(exc))
 
-        receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+        # web3's default wait is 120s — far too generous for a local
+        # auto-mining Anvil (a healthy receipt returns in well under a
+        # second) and, per a real overnight benchmark run, too slow to
+        # notice a wedged node quickly: it hung here after ~10 hours of
+        # sustained snapshot/revert load with nothing checkpointed since.
+        # This still raises (not swallowed) rather than being folded into
+        # ExecResult.reverted — an infra hang is not "an invalid candidate"
+        # and treating it as one would make a dead node look like a search
+        # loop quietly grinding through reverts forever. Callers that need
+        # to survive this (experiments/benchmark.py's multi-hour sweep)
+        # catch it at their own natural retry boundary.
+        receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
         if receipt.status == 0:
             return ExecResult(reverted=True, gas_used=receipt.gasUsed, tx_hash=tx_hash.hex())
         return ExecResult(reverted=False, gas_used=receipt.gasUsed, tx_hash=tx_hash.hex())

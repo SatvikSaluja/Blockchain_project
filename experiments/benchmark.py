@@ -118,10 +118,32 @@ def run_benchmark(
     all_results: list[TrialResult] = []
     summaries: list[ConfigSummary] = []
 
+    failed_configs: list[str] = []
     for config_name, transform in CONFIGS.items():
         t0 = time.monotonic()
         scenario = transform(base)
-        results = run_head_to_head_scenario(scenario, n_seeds, budget, base_seed, minimize_after=minimize_after)
+
+        # One retry (fresh Anvil + redeploy, since run_head_to_head_scenario
+        # opens its own) before giving up on a config: a multi-hour sweep
+        # hit a real node hang after ~10 hours of sustained snapshot/revert
+        # load (bridge.py's wait_for_transaction_receipt timeout) with
+        # nothing checkpointed since — an uncaught exception here loses
+        # every config after it too, not just the one that hit trouble.
+        results = None
+        for attempt in (1, 2):
+            try:
+                results = run_head_to_head_scenario(
+                    scenario, n_seeds, budget, base_seed, minimize_after=minimize_after
+                )
+                break
+            except Exception as exc:
+                typer.echo(f"[{config_name}] attempt {attempt} failed: {exc!r}")
+
+        if results is None:
+            typer.echo(f"[{config_name}] failed twice, skipping — see above for the exception")
+            failed_configs.append(config_name)
+            continue
+
         all_results.extend(results)
         for strategy in ("random", "guided"):
             summaries.append(_summarize_config(config_name, strategy, results))
@@ -135,6 +157,9 @@ def run_benchmark(
         # most the in-progress config's trials, never the whole sweep.
         if out_dir is not None:
             _write_outputs(all_results, summaries, out_dir)
+
+    if failed_configs:
+        typer.echo(f"WARNING: these configs failed twice and are missing from the table: {failed_configs}")
 
     return all_results, summaries
 
