@@ -135,6 +135,7 @@ def deploy_scenario(w3: Web3, scenario: Scenario) -> Deployment:
         w3,
         "AttackExecutor",
         amm.address,
+        "0x0000000000000000000000000000000000000000",  # amm2: no second pool in any current scenario
         oracle.address,
         lending.address,
         flash_lender.address,

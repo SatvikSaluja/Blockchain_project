@@ -270,14 +270,24 @@ fix) is a direct demonstration of what skipping that rigor costs.
       default). **Verify:** `forge test` 42/42 (was 40/40) — all pre-existing
       tests unchanged plus two new ones proving nonzero fee actually reduces
       output vs. zero-fee and strictly grows `k`. Small.
-- [ ] **Task 34: Multi-pool routing** (§13.3, second half). Not free: the
-      DSL's `Action.target` field already exists generically, but
-      `AttackExecutor._run` hardcodes one immutable `amm` and
-      `require(a.target == address(amm))` rejects every other address —
-      routing needs the executor generalized to swap against an arbitrary
-      pool address (or a small allowlist), plus scenario/deploy support for
-      >1 pool. **Verify:** unit test with two pools at different prices,
-      candidate routes through the cheaper one. Medium. Not started.
+- [x] **Task 34: Multi-pool routing** (§13.3, second half). Scoped to what
+      the spec bullet actually asks ("makes the fake market less toy-like")
+      rather than full N-pool generality: `AttackExecutor` takes one
+      optional second pool (`amm2`), `address(0)` disables it — every
+      existing scenario/test passes 0 and is byte-for-byte unaffected. A
+      fixed, pre-approved 2-pool allowlist (`_pool(target)`) rather than
+      per-call dynamic approval to an attacker-suppliable address, which
+      would be the wrong kind of "generic" here — cheap insurance since the
+      search engine's mutation operators can and do generate arbitrary
+      target addresses. **Verify:** `test_swapRoutesToTheTargetedPool` —
+      two pools seeded to different prices, a candidate targeting the
+      second lands on its reserves/formula and leaves the first pool's
+      reserves untouched; `test_swapToUnknownPoolReverts` covers the
+      allowlist rejection. forge test 44/44 (was 42/42). Deliberately did
+      NOT extend `scenario.py`/the search engine to actually explore
+      multi-pool scenarios — that's a real, separate follow-on (teaching
+      the mutation/fitness layer a second pool exists) if ever wanted, not
+      implied by "the contract can route."
 - [ ] **Task 32: TWAPOracle + multi-block harness** (§13.1). Explicit
       hardest item — a windowed price average defeats exactly the single-tx
       manipulation this engine currently finds, which is the point, but it

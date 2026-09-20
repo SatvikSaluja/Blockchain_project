@@ -44,7 +44,7 @@ abstract contract Fixture is Test {
 
         vm.prank(attacker);
         executor = new AttackExecutor(
-            address(amm), address(oracle), address(lending), address(flashLender), address(usd), address(col)
+            address(amm), address(0), address(oracle), address(lending), address(flashLender), address(usd), address(col)
         );
 
         // Seed AMM liquidity.

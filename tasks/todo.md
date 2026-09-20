@@ -75,10 +75,14 @@ Full task detail (acceptance criteria, verification, files) lives in
       to the contract until now. Default 0 everywhere existing, so this is
       purely additive (forge test 42/42, all pre-existing behavior
       byte-for-byte unchanged).
-- [ ] Task 34: Multi-pool routing (§13.3, second half) — AttackExecutor
-      currently hardcodes one immutable `amm` and rejects any other target;
-      needs generalizing to swap against an arbitrary pool address. Not
-      started.
+- [x] Task 34: Multi-pool routing (§13.3, second half) — AttackExecutor
+      takes an optional second pool (`amm2`, address(0) = disabled, every
+      existing scenario/test unaffected); SWAP actions resolve their target
+      against a small fixed allowlist (`amm`/`amm2`) instead of one
+      hardcoded pool. Proven with a real test: two pools seeded to
+      different prices, a candidate targeting the second pool lands on its
+      reserves/formula and leaves the first pool untouched. forge test
+      44/44 (was 42/42).
 - [ ] Task 32: TWAPOracle + multi-block harness (§13.1) — stretch, explicit
       SPEC-designated hardest item (different execution model: block-
       advancing, not snapshot/restore). Not started.

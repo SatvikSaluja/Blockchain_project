@@ -54,6 +54,7 @@ contract AttackExecutor is IFlashLoanReceiver {
     uint256 public constant MAX_ACTIONS = 6;
 
     ConstantProductAMM public immutable amm;
+    ConstantProductAMM public immutable amm2; // address(0) if this scenario has no second pool
     IOracle public immutable oracle;
     LendingMarket public immutable lending;
     FlashLender public immutable flashLender;
@@ -61,8 +62,21 @@ contract AttackExecutor is IFlashLoanReceiver {
     IERC20 public immutable col;
     address public immutable owner;
 
-    constructor(address _amm, address _oracle, address _lending, address _flashLender, address _usd, address _col) {
+    /// @param _amm2 SPEC §13.3 multi-pool routing: a second pool a candidate's
+    /// SWAP actions may target instead of `_amm`, or address(0) to disable
+    /// routing entirely (every existing scenario/test passes 0 here and gets
+    /// byte-for-byte the old single-pool behavior).
+    constructor(
+        address _amm,
+        address _amm2,
+        address _oracle,
+        address _lending,
+        address _flashLender,
+        address _usd,
+        address _col
+    ) {
         amm = ConstantProductAMM(_amm);
+        amm2 = ConstantProductAMM(_amm2);
         oracle = IOracle(_oracle);
         lending = LendingMarket(_lending);
         flashLender = FlashLender(_flashLender);
@@ -70,9 +84,13 @@ contract AttackExecutor is IFlashLoanReceiver {
         col = IERC20(_col);
         owner = msg.sender;
 
-        // Approve the two contracts this executor ever pushes funds through.
+        // Approve every contract this executor ever pushes funds through.
         usd.approve(_amm, type(uint256).max);
         col.approve(_amm, type(uint256).max);
+        if (_amm2 != address(0)) {
+            usd.approve(_amm2, type(uint256).max);
+            col.approve(_amm2, type(uint256).max);
+        }
         usd.approve(_lending, type(uint256).max);
         col.approve(_lending, type(uint256).max);
     }
@@ -114,15 +132,15 @@ contract AttackExecutor is IFlashLoanReceiver {
         AmountRule r = AmountRule(a.amountRule);
 
         if (t == ActionType.SWAP_USD_FOR_COL) {
-            require(a.target == address(amm), "AttackExecutor: bad target");
-            (uint256 rUsd,) = amm.getReserves();
+            ConstantProductAMM pool = _pool(a.target);
+            (uint256 rUsd,) = pool.getReserves();
             amt = _min(_resolve(r, a.amountParam, usd, rUsd), usd.balanceOf(address(this)));
-            if (amt > 0) amm.swapUsdForCol(amt);
+            if (amt > 0) pool.swapUsdForCol(amt);
         } else if (t == ActionType.SWAP_COL_FOR_USD) {
-            require(a.target == address(amm), "AttackExecutor: bad target");
-            (, uint256 rCol) = amm.getReserves();
+            ConstantProductAMM pool = _pool(a.target);
+            (, uint256 rCol) = pool.getReserves();
             amt = _min(_resolve(r, a.amountParam, col, rCol), col.balanceOf(address(this)));
-            if (amt > 0) amm.swapColForUsd(amt);
+            if (amt > 0) pool.swapColForUsd(amt);
         } else if (t == ActionType.DEPOSIT_COL) {
             require(a.target == address(lending), "AttackExecutor: bad target");
             (, uint256 rCol) = amm.getReserves();
@@ -145,6 +163,18 @@ contract AttackExecutor is IFlashLoanReceiver {
             amt = _min(_resolve(r, a.amountParam, col, rCol), lending.collateralOf(address(this)));
             if (amt > 0) lending.withdrawCollateral(amt);
         }
+    }
+
+    /// @dev SPEC §13.3 multi-pool routing: a SWAP action's `target` must be
+    /// `amm` or (if this scenario deployed one) `amm2` — never an arbitrary
+    /// address. A fixed, pre-approved allowlist rather than dynamic
+    /// per-call approval: safe regardless of what the search engine's
+    /// mutation operators generate, and the only two pools that could ever
+    /// exist in a deployed scenario anyway.
+    function _pool(address target) internal view returns (ConstantProductAMM) {
+        if (target == address(amm)) return amm;
+        if (target != address(0) && target == address(amm2)) return amm2;
+        revert("AttackExecutor: unknown pool");
     }
 
     /// @dev Amount-rule resolution against live state (SPEC §3.6 table).

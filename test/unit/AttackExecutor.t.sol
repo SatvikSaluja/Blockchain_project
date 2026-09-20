@@ -52,7 +52,7 @@ contract AttackExecutorTest is Test {
         col.mint(address(flashLender), 1_000_000e18);
 
         executor = new AttackExecutor(
-            address(amm), address(oracle), address(lending), address(flashLender), address(usd), address(col)
+            address(amm), address(0), address(oracle), address(lending), address(flashLender), address(usd), address(col)
         );
 
         // Seed capital already sitting in the executor, independent of the
@@ -177,6 +177,53 @@ contract AttackExecutorTest is Test {
         actions[0] = _action(AttackExecutor.ActionType.DEPOSIT_COL, address(0xBEEF), AttackExecutor.AmountRule.FIXED, 1);
         vm.expectRevert("AttackExecutor: bad target");
         executor.executeAttack(address(usd), 1_000e18, actions);
+    }
+
+    function test_swapRoutesToTheTargetedPool() public {
+        // A second pool, seeded with different reserves so it quotes a
+        // different price than `amm` — 2 COL per USD here vs. 1:1 on `amm`.
+        ConstantProductAMM amm2 = new ConstantProductAMM(address(usd), address(col), 0);
+        address lp2 = address(0x2);
+        usd.mint(lp2, 500_000e18);
+        col.mint(lp2, 1_000_000e18);
+        vm.startPrank(lp2);
+        usd.approve(address(amm2), type(uint256).max);
+        col.approve(address(amm2), type(uint256).max);
+        amm2.addLiquidity(500_000e18, 1_000_000e18);
+        vm.stopPrank();
+
+        AttackExecutor routedExecutor = new AttackExecutor(
+            address(amm), address(amm2), address(oracle), address(lending), address(flashLender), address(usd), address(col)
+        );
+        usd.mint(address(routedExecutor), PREFUND);
+        col.mint(address(routedExecutor), PREFUND);
+
+        (uint256 rUsd1Before, uint256 rCol1Before) = amm.getReserves();
+        (uint256 rUsd2Before, uint256 rCol2Before) = amm2.getReserves();
+        uint256 expectedOutOnAmm2 = (rCol2Before * 10_000e18) / (rUsd2Before + 10_000e18);
+
+        AttackExecutor.Action[] memory actions = new AttackExecutor.Action[](1);
+        actions[0] =
+            _action(AttackExecutor.ActionType.SWAP_USD_FOR_COL, address(amm2), AttackExecutor.AmountRule.FIXED, 10_000e18);
+        routedExecutor.executeAttack(address(usd), 100_000e18, actions);
+
+        // Landed on amm2, at amm2's formula/reserves...
+        assertEq(col.balanceOf(address(routedExecutor)), PREFUND + expectedOutOnAmm2);
+        (uint256 rUsd2After, uint256 rCol2After) = amm2.getReserves();
+        assertEq(rUsd2After, rUsd2Before + 10_000e18);
+        assertEq(rCol2After, rCol2Before - expectedOutOnAmm2);
+        // ...and never touched the primary pool at all.
+        (uint256 rUsd1After, uint256 rCol1After) = amm.getReserves();
+        assertEq(rUsd1After, rUsd1Before);
+        assertEq(rCol1After, rCol1Before);
+    }
+
+    function test_swapToUnknownPoolReverts() public {
+        AttackExecutor.Action[] memory actions = new AttackExecutor.Action[](1);
+        actions[0] =
+            _action(AttackExecutor.ActionType.SWAP_USD_FOR_COL, address(0xBEEF), AttackExecutor.AmountRule.FIXED, 1_000e18);
+        vm.expectRevert("AttackExecutor: unknown pool");
+        executor.executeAttack(address(usd), 10_000e18, actions);
     }
 
     function test_revertsWhenCalledByNonOwner() public {
