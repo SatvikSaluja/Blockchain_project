@@ -241,6 +241,13 @@ def main(
     )
 
     typer.echo(render_markdown_table(summaries))
+    # Always write at the end too, not just per-config: if every config
+    # fails both attempts, the per-config checkpoint inside run_benchmark()
+    # never fires and this "wrote ..." message would otherwise be a lie —
+    # disk state must always reflect what actually happened this run, even
+    # an all-empty one, rather than silently leaving a stale prior run's
+    # files in place under a misleading "wrote" claim.
+    _write_outputs(all_results, summaries, out_dir)
     typer.echo(f"wrote {out_dir / 'benchmark_results.md'}, benchmark_raw.csv, benchmark_summary.csv")
 
 
