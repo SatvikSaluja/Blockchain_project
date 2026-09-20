@@ -49,7 +49,7 @@ contract AMMInvariantsTest is StdInvariant, Test {
     function setUp() public {
         MockToken usd = new MockToken("USD", "USD");
         MockToken col = new MockToken("Collateral", "COL");
-        amm = new ConstantProductAMM(address(usd), address(col));
+        amm = new ConstantProductAMM(address(usd), address(col), 0);
 
         usd.mint(address(this), SEED_USD);
         col.mint(address(this), SEED_COL);

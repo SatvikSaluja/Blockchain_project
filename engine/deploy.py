@@ -125,7 +125,7 @@ def deploy_scenario(w3: Web3, scenario: Scenario) -> Deployment:
 
     usd = _deploy(w3, "MockToken", "USD Coin", "USD")
     col = _deploy(w3, "MockToken", "Collateral", "COL")
-    amm = _deploy(w3, "ConstantProductAMM", usd.address, col.address)
+    amm = _deploy(w3, "ConstantProductAMM", usd.address, col.address, scenario.amm.fee_bps)
     oracle = _deploy(w3, "SpotOracle", amm.address)
     lending = _deploy(
         w3, "LendingMarket", oracle.address, usd.address, col.address, scenario.lending.collateral_factor_bps

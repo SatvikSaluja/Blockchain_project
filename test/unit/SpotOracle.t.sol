@@ -17,7 +17,7 @@ contract SpotOracleTest is Test {
     function setUp() public {
         usd = new MockToken("USD", "USD");
         col = new MockToken("Collateral", "COL");
-        amm = new ConstantProductAMM(address(usd), address(col));
+        amm = new ConstantProductAMM(address(usd), address(col), 0);
         oracle = new SpotOracle(address(amm));
 
         usd.mint(lp, 1_000_000e18);

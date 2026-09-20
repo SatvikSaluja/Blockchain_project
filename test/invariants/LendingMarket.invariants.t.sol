@@ -116,7 +116,7 @@ contract LendingMarketInvariantsTest is StdInvariant, Test {
     function setUp() public {
         MockToken usd = new MockToken("USD", "USD");
         MockToken col = new MockToken("Collateral", "COL");
-        ConstantProductAMM amm = new ConstantProductAMM(address(usd), address(col));
+        ConstantProductAMM amm = new ConstantProductAMM(address(usd), address(col), 0);
         SpotOracle oracle = new SpotOracle(address(amm));
         lending = new LendingMarket(address(oracle), address(usd), address(col), CONSERVATIVE_COLLATERAL_FACTOR_BPS);
 

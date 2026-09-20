@@ -3,19 +3,27 @@ pragma solidity ^0.8.24;
 
 import {IERC20} from "../tokens/IERC20.sol";
 
-/// @notice Uniswap-v2-style x*y=k pool. Zero swap fee in v1 (SPEC §3.2) — a
-/// configurable fee is a post-MVP extension; the zero-fee pool keeps the
-/// manipulation math exact for the hand-derived Phase-2 exploit.
+/// @notice Uniswap-v2-style x*y=k pool. Configurable swap fee (SPEC §13.3 —
+/// "add a configurable fee later" was v1's own note; default 0 everywhere in
+/// this repo keeps the manipulation math exact for the hand-derived Phase-2
+/// exploit, and existing scenarios/deployments are unaffected by this field
+/// existing). Fee is taken on the input, Uniswap-v2 style: the trader pays
+/// the full amount, output is computed on the fee-reduced amount, and the
+/// fee itself stays in reserves — so k strictly increases when feeBps > 0
+/// instead of merely holding, and is byte-for-byte the old zero-fee formula
+/// when feeBps == 0.
 contract ConstantProductAMM {
     IERC20 public immutable usd;
     IERC20 public immutable col;
+    uint256 public immutable feeBps; // e.g. 30 = 0.30%, matching Uniswap v2's default
 
     uint256 public reserveUsd;
     uint256 public reserveCol;
 
-    constructor(address _usd, address _col) {
+    constructor(address _usd, address _col, uint256 _feeBps) {
         usd = IERC20(_usd);
         col = IERC20(_col);
+        feeBps = _feeBps;
     }
 
     function addLiquidity(uint256 usdAmount, uint256 colAmount) external {
@@ -29,13 +37,15 @@ contract ConstantProductAMM {
         return (reserveUsd, reserveCol);
     }
 
-    /// @dev Exact-in swap. `out = (rOut * in) / (rIn + in)` — the zero-fee
-    /// constant-product form. Reverts on zero-out or a k decrease.
+    /// @dev Exact-in swap. `out = (rOut * inWithFee) / (rIn + inWithFee)`,
+    /// `inWithFee = in * (1e4 - feeBps) / 1e4`. Reverts on zero-out or a k
+    /// decrease.
     function swapUsdForCol(uint256 usdIn) external returns (uint256 colOut) {
         require(usdIn > 0, "AMM: zero in");
         uint256 rUsd = reserveUsd;
         uint256 rCol = reserveCol;
-        colOut = (rCol * usdIn) / (rUsd + usdIn);
+        uint256 usdInWithFee = (usdIn * (1e4 - feeBps)) / 1e4;
+        colOut = (rCol * usdInWithFee) / (rUsd + usdInWithFee);
         require(colOut > 0, "AMM: zero out");
 
         require(usd.transferFrom(msg.sender, address(this), usdIn), "AMM: usd transfer failed");
@@ -51,7 +61,8 @@ contract ConstantProductAMM {
         require(colIn > 0, "AMM: zero in");
         uint256 rUsd = reserveUsd;
         uint256 rCol = reserveCol;
-        usdOut = (rUsd * colIn) / (rCol + colIn);
+        uint256 colInWithFee = (colIn * (1e4 - feeBps)) / 1e4;
+        usdOut = (rUsd * colInWithFee) / (rCol + colInWithFee);
         require(usdOut > 0, "AMM: zero out");
 
         require(col.transferFrom(msg.sender, address(this), colIn), "AMM: col transfer failed");

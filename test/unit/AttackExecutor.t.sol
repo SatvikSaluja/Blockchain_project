@@ -30,7 +30,7 @@ contract AttackExecutorTest is Test {
     function setUp() public {
         usd = new MockToken("USD", "USD");
         col = new MockToken("Collateral", "COL");
-        amm = new ConstantProductAMM(address(usd), address(col));
+        amm = new ConstantProductAMM(address(usd), address(col), 0);
         oracle = new SpotOracle(address(amm));
         lending = new LendingMarket(address(oracle), address(usd), address(col), CF_BPS);
         flashLender = new FlashLender(address(usd), address(col), FLASH_FEE_BPS);

@@ -15,7 +15,7 @@ contract AMMTest is Test {
     function setUp() public {
         usd = new MockToken("USD", "USD");
         col = new MockToken("Collateral", "COL");
-        amm = new ConstantProductAMM(address(usd), address(col));
+        amm = new ConstantProductAMM(address(usd), address(col), 0);
 
         usd.mint(lp, 1_000_000e18);
         col.mint(lp, 1_000_000e18);
@@ -97,5 +97,56 @@ contract AMMTest is Test {
     function test_swapZeroInReverts() public {
         vm.expectRevert("AMM: zero in");
         amm.swapUsdForCol(0);
+    }
+
+    function test_nonzeroFee_reducesOutputVsZeroFee() public {
+        ConstantProductAMM feeAmm = new ConstantProductAMM(address(usd), address(col), 30); // 0.30%
+        usd.mint(lp, 1_000_000e18);
+        col.mint(lp, 1_000_000e18);
+        vm.startPrank(lp);
+        usd.approve(address(feeAmm), type(uint256).max);
+        col.approve(address(feeAmm), type(uint256).max);
+        feeAmm.addLiquidity(1_000_000e18, 1_000_000e18);
+        vm.stopPrank();
+
+        usd.mint(trader, 10_000e18);
+        vm.startPrank(trader);
+        usd.approve(address(feeAmm), type(uint256).max);
+
+        (uint256 rUsd, uint256 rCol) = feeAmm.getReserves();
+        uint256 inWithFee = (10_000e18 * (1e4 - 30)) / 1e4;
+        uint256 expectedOut = (rCol * inWithFee) / (rUsd + inWithFee);
+        uint256 zeroFeeOut = (rCol * 10_000e18) / (rUsd + 10_000e18);
+
+        uint256 out = feeAmm.swapUsdForCol(10_000e18);
+        vm.stopPrank();
+
+        assertEq(out, expectedOut);
+        assertLt(out, zeroFeeOut, "fee should strictly reduce output vs the zero-fee formula");
+    }
+
+    function test_nonzeroFee_strictlyIncreasesK() public {
+        ConstantProductAMM feeAmm = new ConstantProductAMM(address(usd), address(col), 30);
+        usd.mint(lp, 1_000_000e18);
+        col.mint(lp, 1_000_000e18);
+        vm.startPrank(lp);
+        usd.approve(address(feeAmm), type(uint256).max);
+        col.approve(address(feeAmm), type(uint256).max);
+        feeAmm.addLiquidity(1_000_000e18, 1_000_000e18);
+        vm.stopPrank();
+
+        (uint256 rUsd0, uint256 rCol0) = feeAmm.getReserves();
+        uint256 k0 = rUsd0 * rCol0;
+
+        usd.mint(trader, 10_000e18);
+        vm.startPrank(trader);
+        usd.approve(address(feeAmm), type(uint256).max);
+        feeAmm.swapUsdForCol(10_000e18);
+        vm.stopPrank();
+
+        (uint256 rUsd1, uint256 rCol1) = feeAmm.getReserves();
+        // Unlike the zero-fee case (k merely non-decreasing from rounding),
+        // a real fee must strictly grow k — that's the fee accruing to LPs.
+        assertGt(rUsd1 * rCol1, k0);
     }
 }

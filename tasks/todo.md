@@ -66,3 +66,27 @@ Full task detail (acceptance criteria, verification, files) lives in
       (reference exploit reverts under it; search fails to find anything in
       12x the budget that succeeds on baseline). Full N>=20 default-budget
       run is a documented manual step.
+
+## Phase 7: Extensions (post-MVP, SPEC §13) — build order chosen by
+   risk/cost, not the spec's listed order; see tasks/plan.md "Phase 7" for
+   the full reasoning per task.
+- [x] Task 33: Configurable AMM swap fee (§13.3, first half) — ConstantProductAMM
+      takes feeBps; scenario schema already had the field, was never wired
+      to the contract until now. Default 0 everywhere existing, so this is
+      purely additive (forge test 42/42, all pre-existing behavior
+      byte-for-byte unchanged).
+- [ ] Task 34: Multi-pool routing (§13.3, second half) — AttackExecutor
+      currently hardcodes one immutable `amm` and rejects any other target;
+      needs generalizing to swap against an arbitrary pool address. Not
+      started.
+- [ ] Task 32: TWAPOracle + multi-block harness (§13.1) — stretch, explicit
+      SPEC-designated hardest item (different execution model: block-
+      advancing, not snapshot/restore). Not started.
+- [ ] Task 35: Second vulnerability class (§13.2, e.g. first-depositor
+      share-price inflation) — proves the search engine generalizes beyond
+      one bug family. Not started.
+- [ ] Task 36: Coverage-guided hybrid search (§13.4) — EVM step-tracing
+      blended with the existing economic fitness signal. Not started.
+- [x] Task 37: Static showcase/results page (§13.5, lean version only — the
+      spec's own lowest-priority item, and explicitly NOT the live
+      interactive dashboard). Published as artifact "Case 1337."

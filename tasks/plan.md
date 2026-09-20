@@ -246,6 +246,75 @@ candidate budget — is a documented manual step (`python -m
 experiments.benchmark --no-fast`), consistent with the plan's own risk
 mitigation for Task 31.
 
+### Phase 7: Extensions (post-MVP, SPEC §13)
+
+SPEC §13 lists five extensions with one line each — none spec'd to the depth
+Phases 1-6 got (exact interfaces, schemas, algorithms). Build order here is
+chosen by risk/cost/dependency, **not** the spec's own listed priority order:
+start with the smallest, most contained, highest-confidence slice, and treat
+each remaining item as its own phase-sized effort requiring real design
+before implementation — not something to batch alongside the others in one
+pass. That mirrors how Phases 1-6 themselves were built (spec → implement →
+test → verify → commit, one gated step at a time), and this repo's own
+`benchmark.py` history (§ Phase 6 status, and the "real overnight-run crash"
+fix) is a direct demonstration of what skipping that rigor costs.
+
+- [x] **Task 33: Configurable AMM swap fee** (§13.3, first half). SPEC's own
+      scenario schema already had `amm.feeBps` (Appendix; `engine/scenario.py`
+      already parsed it) — the contract and `engine/deploy.py` just never
+      used it. `ConstantProductAMM` now takes `feeBps` in its constructor;
+      swap math takes the fee on input, Uniswap-v2 style
+      (`inWithFee = in * (1e4-feeBps)/1e4`), so `k` strictly increases
+      instead of merely holding when `feeBps > 0`, and is byte-for-byte the
+      old zero-fee formula when `feeBps == 0` (every existing deployment
+      default). **Verify:** `forge test` 42/42 (was 40/40) — all pre-existing
+      tests unchanged plus two new ones proving nonzero fee actually reduces
+      output vs. zero-fee and strictly grows `k`. Small.
+- [ ] **Task 34: Multi-pool routing** (§13.3, second half). Not free: the
+      DSL's `Action.target` field already exists generically, but
+      `AttackExecutor._run` hardcodes one immutable `amm` and
+      `require(a.target == address(amm))` rejects every other address —
+      routing needs the executor generalized to swap against an arbitrary
+      pool address (or a small allowlist), plus scenario/deploy support for
+      >1 pool. **Verify:** unit test with two pools at different prices,
+      candidate routes through the cheaper one. Medium. Not started.
+- [ ] **Task 32: TWAPOracle + multi-block harness** (§13.1). Explicit
+      hardest item — a windowed price average defeats exactly the single-tx
+      manipulation this engine currently finds, which is the point, but it
+      needs the harness to *advance real blocks* (`evm_mine`,
+      `evm_increaseTime`) between actions and hold attacker capital across
+      them: a genuinely different execution/candidate model than the
+      intra-tx snapshot/restore every other part of this engine (bridge,
+      search, evaluator) assumes. Needs its own design pass before coding
+      starts — candidate representation, how minimization works across
+      blocks, how the evaluator's independent-reference-price rule extends.
+      Large. Not started.
+- [ ] **Task 35: Second vulnerability class** (§13.2, e.g. first-depositor
+      share-price inflation — a real, well-known DeFi bug class, distinct
+      from oracle manipulation). Needs a new vulnerable contract, a new
+      hand-written Phase-2-style manual reference exploit proving it's
+      real, and likely new `ActionType`s for the DSL/executor. The point is
+      proving the search engine generalizes past one lucky bug family, so
+      it should get the same phase-2-then-phase-4 rigor the original bug
+      did, not a shortcut. Large. Not started.
+- [ ] **Task 36: Coverage-guided hybrid search** (§13.4). Blend the
+      existing economic-signal fitness with real EVM code-coverage (SPEC
+      names `--steps-tracing`) for a true greybox signal. The most
+      research-flavored item — needs its own investigation into what Anvil
+      actually exposes for step/branch coverage before a fitness formula
+      combining the two signals can be designed, let alone implemented.
+      Large, and the one item where "how" isn't yet knowable without a
+      spike. Not started.
+- [x] **Task 37: Static showcase/results page** (§13.5, lean version only).
+      SPEC ranks a "web dashboard for live corpus/fitness visualization"
+      dead last of all five extensions; built the lean, explicitly-scoped
+      version instead of the full interactive app — a static single-page
+      showcase (the real discovered exploit, its price-manipulation chart,
+      the patched-vs-unpatched comparison), not a live search-launching
+      dashboard, which would need a real backend wrapping the Python engine
+      and is not what a research/fuzzing tool needs (SPEC: "explicitly out
+      of scope for v1"). Published as Artifact "Case 1337."
+
 ## Risks and Mitigations
 
 | Risk | Impact | Mitigation |
