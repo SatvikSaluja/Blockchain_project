@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: forge build
+        run: forge build
+
+      - name: forge test
+        run: forge test -vvv
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      # Excludes @pytest.mark.discovery (live-Anvil, many-candidate search /
+      # benchmark tests) — same "fast suite" split the README documents,
+      # kept fast and deterministic for CI. Run the full suite (`pytest`,
+      # no -m filter) and experiments/benchmark.py locally, not in CI.
+      - name: Python fast suite
+        run: python -m pytest -m "not discovery" -q
