@@ -57,3 +57,22 @@ def test_run_benchmark_produces_a_summary_row_per_config_per_strategy(tmp_path):
         "mean_wall_clock_s",
         "mean_minimized_length",
     }
+
+
+@pytest.mark.discovery  # spins up several live Anvils at once; keep out of the fast suite
+def test_run_benchmark_parallel_covers_every_config_and_orders_the_table(tmp_path):
+    # jobs>1 runs configs concurrently on distinct ports; the table must
+    # still carry every config in CONFIGS order regardless of which worker
+    # finished first. base_port well clear of the default so this can't
+    # collide with a real running benchmark.
+    all_results, summaries = run_benchmark(
+        SCENARIO_PATH, n_seeds=1, budget=12, base_seed=0, minimize_after=False,
+        out_dir=tmp_path, jobs=len(CONFIGS), base_port=8720,
+    )
+
+    assert len(summaries) == len(CONFIGS) * 2
+    assert {s.config for s in summaries} == set(CONFIGS.keys())
+    # Stable CONFIGS order (not completion order): dedupe preserving first-seen.
+    seen = list(dict.fromkeys(s.config for s in summaries))
+    assert seen == list(CONFIGS.keys())
+    assert (tmp_path / "benchmark_results.md").exists()

@@ -97,17 +97,24 @@ def _run_trial(
 
 
 def run_head_to_head_scenario(
-    scenario: Scenario, n_seeds: int, budget: int, base_seed: int = 0, minimize_after: bool = False
+    scenario: Scenario,
+    n_seeds: int,
+    budget: int,
+    base_seed: int = 0,
+    minimize_after: bool = False,
+    port: int = 8545,
 ) -> list[TrialResult]:
     """One persistent Anvil + one deployment for the whole benchmark (SPEC
     §5) — every trial's ExecutionBridge.restore() call already guarantees a
     clean baseline before the next one, so redeploying per trial would just
     be the same wasted-work mistake §5 warns against, one level up. Takes a
     `Scenario` object directly so experiments/benchmark.py's parameter sweep
-    (Task 31) can run variants without round-tripping through a temp file."""
+    (Task 31) can run variants without round-tripping through a temp file.
+    `port` lets the caller run several configs concurrently, each on its own
+    Anvil, without colliding (experiments/benchmark.py parallel mode)."""
     results: list[TrialResult] = []
 
-    with AnvilProcess() as anvil:
+    with AnvilProcess(port=port) as anvil:
         w3 = Web3(Web3.HTTPProvider(anvil.rpc_url))
         deployment = deploy_scenario(w3, scenario)
         bridge = ExecutionBridge(deployment)

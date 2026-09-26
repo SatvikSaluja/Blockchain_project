@@ -11,18 +11,21 @@ engine is finding a *real* vulnerability class, not an artifact: exploit
 rate should drop sharply once collateral is conservative enough that even a
 ~2x price manipulation can't produce bad debt.
 
---fast mode (default here, opt out with --no-fast) drastically reduces N and
-budget so the pipeline is verifiable within a single session — this machine
-is shared/memory-constrained (see tasks/plan.md's Phase 5 status) and the
-full run can genuinely take hours, which SPEC §12 wants (rigor over speed).
-The full N>=20, scenario-default-budget run is a documented manual step:
+--fast mode (default, opt out with --no-fast) reduces N and budget so the
+pipeline is verifiable in minutes. For a real N>=20 sweep, `--jobs N` runs
+that many configs concurrently (each on its own Anvil port, base_port + i),
+which shrinks wall-clock roughly Nx — the difference between a run that
+finishes inside one session and one that keeps getting killed mid-sweep on
+this environment. Outputs checkpoint after every config that lands, so even
+a killed run keeps whatever already completed. A representative hard run:
 
-    python -m experiments.benchmark --no-fast
+    python -m experiments.benchmark --no-fast --budget 8000 --jobs 5
 """
 
 from __future__ import annotations
 
 import time
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
@@ -31,6 +34,11 @@ import typer
 
 from engine.scenario import Scenario
 from experiments.random_vs_guided import TrialResult, run_head_to_head_scenario, write_csv
+
+# Base port for parallel workers. Each config gets base_port + its index, so
+# concurrent Anvils never collide — and we stay clear of 8545 (engine/cli.py
+# and the fast test suite's default) so a benchmark can run alongside them.
+DEFAULT_BASE_PORT = 8600
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_SCENARIO = REPO_ROOT / "scenarios" / "vulnerable.json"
@@ -106,6 +114,32 @@ def _summarize_config(config: str, strategy: str, results: list[TrialResult]) ->
     return ConfigSummary(config, strategy, len(trials), rate, mean_c, std_c, mean_wc, mean_len)
 
 
+def _run_one_config(
+    config_name: str,
+    scenario_path: Path,
+    n_seeds: int,
+    budget: int,
+    base_seed: int,
+    minimize_after: bool,
+    port: int,
+) -> tuple[str, Optional[list[TrialResult]], Optional[str]]:
+    """Top-level worker (must be picklable for ProcessPoolExecutor): run one
+    config's full guided-vs-random head-to-head on its own Anvil `port`, with
+    one retry before giving up. Returns (name, results | None, error | None).
+    Loads the scenario and looks up the transform by name inside the worker
+    so nothing scenario/transform-shaped has to cross the process boundary."""
+    scenario = CONFIGS[config_name](Scenario.load(scenario_path))
+    for attempt in (1, 2):
+        try:
+            results = run_head_to_head_scenario(
+                scenario, n_seeds, budget, base_seed, minimize_after=minimize_after, port=port
+            )
+            return (config_name, results, None)
+        except Exception as exc:  # noqa: BLE001 — reported back, not swallowed
+            last = f"attempt {attempt}: {exc!r}"
+    return (config_name, None, last)
+
+
 def run_benchmark(
     scenario_path: Path,
     n_seeds: int,
@@ -113,50 +147,63 @@ def run_benchmark(
     base_seed: int = 0,
     minimize_after: bool = True,
     out_dir: Optional[Path] = None,
+    jobs: int = 1,
+    base_port: int = DEFAULT_BASE_PORT,
 ) -> tuple[list[TrialResult], list[ConfigSummary]]:
-    base = Scenario.load(scenario_path)
+    """Run every config's head-to-head, up to `jobs` at a time in parallel
+    (each on its own Anvil port). Checkpoints outputs as each config lands,
+    so a killed run keeps every config that already finished — and parallel
+    configs shrink wall-clock roughly `jobs`x, which is what makes a full
+    N>=20 sweep actually finish inside one session on this environment."""
+    config_order = {name: i for i, name in enumerate(CONFIGS)}
     all_results: list[TrialResult] = []
     summaries: list[ConfigSummary] = []
-
     failed_configs: list[str] = []
-    for config_name, transform in CONFIGS.items():
-        t0 = time.monotonic()
-        scenario = transform(base)
 
-        # One retry (fresh Anvil + redeploy, since run_head_to_head_scenario
-        # opens its own) before giving up on a config: a multi-hour sweep
-        # hit a real node hang after ~10 hours of sustained snapshot/revert
-        # load (bridge.py's wait_for_transaction_receipt timeout) with
-        # nothing checkpointed since — an uncaught exception here loses
-        # every config after it too, not just the one that hit trouble.
-        results = None
-        for attempt in (1, 2):
-            try:
-                results = run_head_to_head_scenario(
-                    scenario, n_seeds, budget, base_seed, minimize_after=minimize_after
-                )
-                break
-            except Exception as exc:
-                typer.echo(f"[{config_name}] attempt {attempt} failed: {exc!r}")
-
+    def _record(config_name: str, results: Optional[list[TrialResult]], error: Optional[str], elapsed: float) -> None:
         if results is None:
-            typer.echo(f"[{config_name}] failed twice, skipping — see above for the exception")
+            typer.echo(f"[{config_name}] failed twice, skipping — {error}")
             failed_configs.append(config_name)
-            continue
-
+            return
         all_results.extend(results)
         for strategy in ("random", "guided"):
             summaries.append(_summarize_config(config_name, strategy, results))
-
+        # Keep the table in CONFIGS order regardless of completion order.
+        summaries.sort(key=lambda s: (config_order[s.config], s.strategy))
         typer.echo(
-            f"[{config_name}] done in {(time.monotonic() - t0) / 60:.1f} min, "
+            f"[{config_name}] done in {elapsed / 60:.1f} min, "
             f"{sum(r.discovered for r in results)}/{len(results)} trials discovered"
         )
-        # Checkpoint after every config: this machine has a documented OOM
-        # history (tasks/plan.md, Phase 5 status) — a killed run loses at
-        # most the in-progress config's trials, never the whole sweep.
         if out_dir is not None:
             _write_outputs(all_results, summaries, out_dir)
+
+    if jobs <= 1:
+        for i, config_name in enumerate(CONFIGS):
+            t0 = time.monotonic()
+            name, results, error = _run_one_config(
+                config_name, scenario_path, n_seeds, budget, base_seed, minimize_after, base_port + i
+            )
+            _record(name, results, error, time.monotonic() - t0)
+    else:
+        starts: dict = {}
+        with ProcessPoolExecutor(max_workers=jobs) as pool:
+            futures = {}
+            for i, config_name in enumerate(CONFIGS):
+                starts[config_name] = time.monotonic()
+                fut = pool.submit(
+                    _run_one_config,
+                    config_name,
+                    scenario_path,
+                    n_seeds,
+                    budget,
+                    base_seed,
+                    minimize_after,
+                    base_port + i,
+                )
+                futures[fut] = config_name
+            for fut in as_completed(futures):
+                name, results, error = fut.result()
+                _record(name, results, error, time.monotonic() - starts[name])
 
     if failed_configs:
         typer.echo(f"WARNING: these configs failed twice and are missing from the table: {failed_configs}")
@@ -228,6 +275,10 @@ def main(
     budget: Optional[int] = typer.Option(None, help="Override the candidate budget per trial"),
     base_seed: int = typer.Option(0, help="First seed; seeds base_seed..base_seed+n_seeds-1"),
     minimize: bool = typer.Option(True, help="Minimize each found exploit for the length metric (slower)"),
+    jobs: int = typer.Option(
+        1, help="Configs to run in parallel, each on its own Anvil port. >1 shrinks wall-clock ~jobs x."
+    ),
+    base_port: int = typer.Option(DEFAULT_BASE_PORT, help="First Anvil port; config i uses base_port + i"),
     out_dir: Path = typer.Option(REPO_ROOT / "experiments"),
 ) -> None:
     if n_seeds is None:
@@ -235,9 +286,13 @@ def main(
     if budget is None:
         budget = 300 if fast else Scenario.load(scenario_path).search.budget_candidates
 
-    typer.echo(f"Benchmarking {len(CONFIGS)} configs x 2 strategies x {n_seeds} seeds, budget={budget}...")
+    typer.echo(
+        f"Benchmarking {len(CONFIGS)} configs x 2 strategies x {n_seeds} seeds, "
+        f"budget={budget}, jobs={jobs}..."
+    )
     all_results, summaries = run_benchmark(
-        scenario_path, n_seeds, budget, base_seed, minimize_after=minimize, out_dir=out_dir
+        scenario_path, n_seeds, budget, base_seed, minimize_after=minimize, out_dir=out_dir,
+        jobs=jobs, base_port=base_port,
     )
 
     typer.echo(render_markdown_table(summaries))
